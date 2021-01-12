@@ -8,6 +8,7 @@ supporter.py
 !.gitignore
 test.py
 tempCodeRunnerFile.py
+test/
 
 .vscode/
 raw/
