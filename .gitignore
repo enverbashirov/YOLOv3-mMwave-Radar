@@ -13,6 +13,7 @@ test/
 .vscode/
 raw/
 
+save/
 !save/jp
 save/jp/*
 !save/jp/final
