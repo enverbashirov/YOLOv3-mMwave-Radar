@@ -1,4 +1,8 @@
+import os
+import shutil
+import pandas as pd
 import matplotlib.pyplot as plt
+import matplotlib.patches as patches
 from dataclasses import dataclass, field
 import tensorflow as tf
 from typing import List
@@ -19,9 +23,9 @@ def polar2cartesian(xp):
     # angles in rad
     return np.array([xp[0]*np.cos(xp[1]), xp[0]*np.sin(xp[1])], dtype=np.float64).reshape(-1, 1)
 
-def cartesian2polar(xc):
+def cartesian2polar(xy):
     # angles in rad
-    return np.array([np.sqrt(self.xy[0]**2 + self.xy[1]**2), np.arctan2(self.xy[1], self.xy[0])]).reshape(-1, 1)
+    return np.array([np.sqrt(xy[0]**2 + xy[1]**2), np.arctan2(xy[1], xy[0])]).reshape(-1, 1)
 
 def deg2rad_shift(angles):
     a = np.copy(angles)
@@ -56,8 +60,75 @@ def IOU_score(a, b):
     area_union = area_a + area_b - area_intersection
     return area_intersection/area_union
 
-
-
+# contains bb calculations and plot function for a single bounding box
+class Supporter:
+    pathTest = ""
+    pathInput = ""
+    pathRawImages = ""
     
+    def __init__(self):
+        self.pathTest = "test"
+        self.pathInput = "save/jp/final"
+        # pathRawImages = "save/raw"
 
+    def main(self):
+        for i, fname in enumerate(os.listdir(self.pathInput)):
+            input = np.load(f'{self.pathInput}/{fname}')
+            print(input.shape)
 
+            # pathCheck(pathTest)
+            inputbb = self.label2bb(input)
+            fig = self.plotRaw(input, bb=inputbb, save=False, showLabels=True)
+            print(type(fig))
+                
+            data = np.fromstring(fig.canvas.tostring_rgb(), dtype=np.uint8, sep='')
+            print(data)
+            data = data.reshape(fig.canvas.get_width_height()[::-1] + (3,))
+            print(data.shape)
+
+            # np.savetxt("test.csv", input, delimiter=",")
+            exit()
+
+    #bb: bounding box. show: display figure. showLabels: colorcode the cluster/labels.
+    def plotRaw(self, data, bb=None, save=False, show=False, showLabels=False, path=pathTest):
+        fig = plt.figure()
+        ax = plt.axes()
+        plt.axis("off")
+
+        if not showLabels:
+            plt.scatter(data[:,0], data[:,1])
+        else:
+            plt.scatter(data[:,0], data[:,1], c=(data[:,3] == 1))
+
+        if bb != None:
+            ax.add_patch(patches.Rectangle((bb[0], bb[2]), bb[1]-bb[0], bb[3]-bb[2], 
+                fill=False, clip_on=False, linewidth=2, color='k'))
+            ax.add_patch(patches.Rectangle((bb[0], bb[3]), 0.22, 0.1, 
+                fill=True, clip_on=False, linewidth=2, color='k'))
+            ax.annotate(' Truth', (bb[0], bb[3]), color='w', ha='left', va='bottom')
+        if show:
+            plt.show()
+        if save:
+            plt.savefig(f'{path}/_test.png', dpi=100)
+
+        fig.canvas.draw()
+        return fig
+
+    #bouding box computation
+    def label2bb(self, data):
+        xmin = np.min(data[(data[:,3] == 1), 0])
+        xmax = np.max(data[(data[:,3] == 1), 0])
+        ymin = np.min(data[(data[:,3] == 1), 1])
+        ymax = np.max(data[(data[:,3] == 1), 1])
+        # print(xmin, xmax, ymin, ymax)
+        return [(xmax-xmin)/2, (ymax-ymin)/2, xmax-xmin, ymax-ymin]
+
+    def pathCheck(self, path):
+        # Create the subsequent save folders
+        if os.path.isdir(path):
+            shutil.rmtree(path)
+        if not os.path.isdir(path):
+            os.makedirs(path)
+
+if __name__ == '__main__':   
+    Supporter().main()

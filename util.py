@@ -105,8 +105,8 @@ def write_results(prediction, confidence, num_classes, nms_conf = 0.4):
     
     for ind in range(batch_size):
         image_pred = prediction[ind]          #image Tensor
-       #confidence threshholding 
-       #NMS
+        #confidence threshholding 
+        #NMS
     
         max_conf, max_conf_score = torch.max(image_pred[:,5:5+ num_classes], 1)
         max_conf = max_conf.float().unsqueeze(1)
@@ -128,8 +128,6 @@ def write_results(prediction, confidence, num_classes, nms_conf = 0.4):
 
         for cls in img_classes:
             #perform NMS
-
-        
             #get the detections with one particular class
             cls_mask = image_pred_*(image_pred_[:,-1] == cls).float().unsqueeze(1)
             class_mask_ind = torch.nonzero(cls_mask[:,-2]).squeeze()

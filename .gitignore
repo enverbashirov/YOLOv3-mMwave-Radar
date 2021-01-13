@@ -3,7 +3,7 @@ yolov3.weights
 yolo/
 yolo.py
 # util.py
-supporter.py
+# supporter.py
 
 # User-defined
 !.gitignore
