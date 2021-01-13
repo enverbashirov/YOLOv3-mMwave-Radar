@@ -1,6 +1,7 @@
 import numpy as np
 import scipy as sp
 from scipy import signal, io
+from scipy.signal.windows import (taylor, nuttall)
 from matplotlib import pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 import os
@@ -36,7 +37,8 @@ if __name__ == '__main__':
     NFFT = 2**10                                                             # number of fft points in range dim
     nr_chn = 16                                                              # number of channels
     # fft will be computed using a hannng window to lower border effects
-    win_range = np.broadcast_to(np.hanning(N-1), (N_loop, nr_chn, N-1)).T    # integral of the window for normalization
+    win_range = np.broadcast_to(nuttall(N-1), (N_loop, nr_chn, N-1)).T    # integral of the window for normalization
+    print(win_range.shape)
     sca_win = np.sum(win_range[:, 0, 0])
 
     v_range = np.arange(NFFT)/NFFT*fs*c0/(2*kf)       # vector of range values for each range bin
@@ -48,25 +50,27 @@ if __name__ == '__main__':
     arg_rmax = np.argmin(np.abs(v_range - r_max))     # index of the max range considered value
     vrange_ext = v_range[arg_rmin:arg_rmax+1]         # vector of range values from rmin to rmax
 
-    # # Angle dimension
-    NFFT_ant = 64                                                                    # number of fft points in angle dim
-    win_ant = np.broadcast_to(np.hanning(nr_chn).reshape(1,-1,1), (vrange_ext.shape[0], nr_chn, N_loop))
-    scawin_ant = np.sum(win_ant[0, :, 0])
-    vang_deg = np.arcsin(2*np.arange(-NFFT_ant/2, NFFT_ant/2)/NFFT_ant)/np.pi*180     # vector of considered angles [-90, 90]
-
-    ant_idx = np.arange(nr_chn)
-    cal_data = io.loadmat('./calibration.mat')['CalData']               # load complex calibration weights for each antenna element 
-    cal_data = cal_data[:16]                                               # keep weights for TX1 only
-    mcal_data = np.broadcast_to(cal_data, (N-1, cal_data.shape[0], N_loop))
-    
     # # Doppler dimension
     NFFT_vel = 256                                                                    # number of fft points in angle dim
-    win_vel = np.broadcast_to(np.hanning(N_loop).reshape(1, 1, -1), (vrange_ext.shape[0], NFFT_ant, N_loop))
-    scawin_vel = np.sum(win_vel[0, 0, :])                                             # scaling factor to normalize window
+    win_vel = np.broadcast_to(nuttall(N_loop).reshape(1, 1, -1), (vrange_ext.shape[0], nr_chn, N_loop))
+    scawin_vel = np.sum(win_vel[0, 0, :])
     vfreq_vel = np.arange(-NFFT_vel/2, NFFT_vel/2)/NFFT_vel*(1/Tp)                    # vector of considered frequencies in Doppler dim
-    v_vel = vfreq_vel*c0/(2*fc)                                                       # transform freqs into velocities
+    v_vel = vfreq_vel*c0/(2*fc)                                                        # transform freqs into velocities
     v_vel = np.delete(v_vel, np.arange(124, 132))                                     # delete velocities close to 0
 
+    # # Angle dimension
+    NFFT_ant = 64                                                                    # number of fft points in angle dim
+    win_ant = np.broadcast_to(taylor(nr_chn, nbar=20, sll=20).reshape(1,-1,1), (vrange_ext.shape[0], nr_chn, NFFT_vel))
+    scawin_ant = np.sum(win_ant[0, :, 0])
+    # win_ant = np.tile(win_ant, (len(vrange_ext), 1))
+    vang_deg = np.arcsin(2*np.arange(-NFFT_ant/2, NFFT_ant/2)/NFFT_ant)/np.pi*180     # vector of considered angles [-90, 90]
+    
+    # ant_idx = np.concatenate([np.arange(nr_chn), np.arange(nr_chn+1, 2*nr_chn)])      # indices of virtual antenna elements
+    ant_idx = np.arange(nr_chn)
+    cal_data = io.loadmat('calibration.mat')['CalData']               # load complex calibration weights for each antenna element 
+    cal_data = cal_data[:16]                                                           # keep weights for TX1 only
+    mcal_data = np.broadcast_to(cal_data, (N-1, cal_data.shape[0], N_loop))
+    
     # # # PROCESS THE RDA SLICES FOR EACH FRAME # # #
     folder = "jp"
     rawpath = f'save/{folder}/chext'
@@ -88,7 +92,7 @@ if __name__ == '__main__':
         Data_orig = np.load(f'{rawpath}/{fname}')
         print('Original data shape: ', Data_orig.shape) 
 
-        parts = [0, 1, 2, 3]
+        parts = [0, 1, 2, 3, 4, 5, 6, 7]
         SIDELOBE_LEVEL = 0.01
         LINTHR_HIGH = -97
         LINTHR_LOW = -107                 
@@ -104,24 +108,29 @@ if __name__ == '__main__':
             print('Time-split data shape', Data.shape)
             
             nsteps = Data.shape[-1]        # last dim is time
-            rda_data = np.zeros((len(vrange_ext), NFFT_ant, NFFT_vel-8, nsteps), dtype=np.float32)
+            rda_data = np.zeros((len(vrange_ext), NFFT_ant, NFFT_vel, nsteps), dtype=np.float32)
 
             for j in range(nsteps):        # loop on the timesteps
                 print('Timestep: {t}'.format(t=j+1), end='\r')
                 RawRadarCube = Data[1:, :, :, j]
-
+                print(RawRadarCube.shape)
                 # Range fft: window, calibration and scaling are applied
                 range_profile = np.fft.fft(RawRadarCube*win_range*mcal_data, NFFT, axis=0)*BrdFuSca/sca_win
                 rp_ext = range_profile[arg_rmin:arg_rmax+1]  # extract only ranges of interest (0 to 10 m)
-                # Angle fft
-                range_angle = np.fft.fftshift(np.fft.fft(rp_ext*win_ant, NFFT_ant, axis=1)/scawin_ant, axes=1)
+                # background subtraction for MTI
+                rp_ext -= np.mean(rp_ext, axis=2, keepdims=True)
                 # Doppler fft
-                range_angle_doppler = np.fft.fftshift(np.fft.fft(range_angle*win_vel, NFFT_vel, axis=2)/scawin_vel, axes=2)
+                range_doppler = np.fft.fftshift(np.fft.fft(rp_ext*win_vel, NFFT_vel, axis=2)/scawin_vel, axes=2)
+                # Angle fft
+                range_angle_doppler = np.fft.fftshift(np.fft.fft(range_doppler*win_ant, NFFT_ant, axis=1)/scawin_ant, axes=1)
+                
                 # absolute value + 20log10 to compute power
-                range_angle_doppler = np.abs(range_angle_doppler)
-                range_angle_doppler = 20*np.log10(range_angle_doppler)
+                range_angle_doppler = 20*np.log10(np.abs(range_angle_doppler))
 
-                range_angle_doppler = np.delete(range_angle_doppler, np.arange(124, 132), axis=2)   # delete velocities close to 0
+                # fig, ax = plt.subplots(1, 2)
+                # ax[0].imshow(range_angle_doppler.max(2))
+                # ax[1].imshow(range_angle_doppler.max(1))
+                # plt.show()
 
                 # at this point you have the RDA representation and you can apply further denoising
                 rdep_thr = np.linspace(LINTHR_HIGH, LINTHR_LOW, range_angle_doppler.shape[0]).reshape((-1, 1, 1))
@@ -137,9 +146,9 @@ if __name__ == '__main__':
 
                 rda_data[:, :, :, j] = range_angle_doppler
 
-            np.save(f'{savepath}/{savename}.npy', np.asarray(rda_data))
+            # np.save(f'{savepath}/{savename}.npy', np.asarray(rda_data))
             print('Saved RDA shape: ', rda_data.shape)
             del Data, rda_data, split_locs
-            sleep(3)
+            # sleep(3)
         del Data_orig
-        sleep(3)
+        # sleep(3)
