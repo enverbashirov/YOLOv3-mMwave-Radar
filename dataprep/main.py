@@ -1,15 +1,18 @@
+import os
+import shutil
+import time
+from argparse import ArgumentParser
+
+import matplotlib
+import matplotlib.patches as patches
 import numpy as np
 from matplotlib import pyplot as plt
-import os
-from sklearn.cluster import DBSCAN
-from argparse import ArgumentParser
-import matplotlib.patches as patches
-import matplotlib
-from kalman_tracker import KalmanTracker
 from matplotlib import rc
+from sklearn.cluster import DBSCAN
+
+from kalman_tracker import KalmanTracker
 from utils import *
-import time
-import shutil
+
 
 def parse_args():
     parser = ArgumentParser()
@@ -21,7 +24,7 @@ def plot(path, data_points, t_list, labels, action, index):
     centers = np.array([kt.xy for kt in t_list])
 
     fig, ax = plt.subplots()
-    plt.scatter(data_points[:, 0, 0], data_points[:, 1, 0], c=labels)
+    plt.scatter(data_points[:, 0, 0], data_points[:, 1, 0], marker='.', c=labels)
     plt.xlabel(r'$x$ [m]')
     plt.ylabel(r'$y$ [m]')
     plt.grid()
@@ -48,6 +51,7 @@ if __name__ == '__main__':
     rawpath = f'save/jp/proc/'
     savepath = f'save/jp/{folder}'
     savename = "truth"
+    plotpath = "figs"
 
     # Create the subsequent save folders
     if os.path.isdir(savepath):
@@ -130,8 +134,8 @@ if __name__ == '__main__':
 
             rav_pts = np.asarray(np.meshgrid(vrange_ext, vang_deg, v_vel,  indexing='ij'))
             norm_rav_pts = np.asarray(np.meshgrid(norm_ran, norm_ang, norm_vel,  indexing='ij'))
-            rav_pts = np.delete(rav_pts, np.arange(124, 132), axis=3)
-            norm_rav_pts = np.delete(norm_rav_pts, np.arange(124, 132), axis=3)
+            # rav_pts = np.delete(rav_pts, np.arange(124, 132), axis=3)
+            # norm_rav_pts = np.delete(norm_rav_pts, np.arange(124, 132), axis=3)
             # select values which are over the threshold
             data = data[arg_rmin:arg_rmax+1,:,:]
             full_indices = (data > thr)
@@ -251,6 +255,6 @@ if __name__ == '__main__':
             rav_pts[1] = deg2rad_shift(rav_pts[1])
             finalsave = np.insert(rav_pts.T, 3, labels, axis=1)
             np.save(finalname, finalsave)
-            # plot(f'{savepath}/{frawname}_', ra_totrack, sel_tracking_list, labels, action, timestep)
+            plot(f'{plotpath}/{frawname}_', ra_totrack, sel_tracking_list, labels, action, timestep)
             # exit()
 

@@ -1,16 +1,15 @@
-import numpy as np
-import scipy as sp
-from scipy import signal, io
-from scipy.signal.windows import (taylor, nuttall)
-from matplotlib import pyplot as plt
-from mpl_toolkits.mplot3d import Axes3D
 import os
-import h5py
 import shutil
 from argparse import ArgumentParser
-from mpl_toolkits.mplot3d import Axes3D
 from time import sleep
 
+import h5py
+import numpy as np
+import scipy as sp
+from matplotlib import pyplot as plt
+from mpl_toolkits.mplot3d import Axes3D
+from scipy import io, signal
+from scipy.signal.windows import nuttall, taylor
 
 if __name__ == '__main__':
     # # # PARAMETERS INIT # # #
@@ -146,7 +145,7 @@ if __name__ == '__main__':
 
                 rda_data[:, :, :, j] = range_angle_doppler
 
-            # np.save(f'{savepath}/{savename}.npy', np.asarray(rda_data))
+            np.save(f'{savepath}/{savename}.npy', np.asarray(rda_data))
             print('Saved RDA shape: ', rda_data.shape)
             del Data, rda_data, split_locs
             # sleep(3)

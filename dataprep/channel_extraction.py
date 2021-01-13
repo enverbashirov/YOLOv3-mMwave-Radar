@@ -1,9 +1,11 @@
-import numpy as np
 import os
-import sys
-import h5py
-from argparse import ArgumentParser
 import shutil
+import sys
+from argparse import ArgumentParser
+
+import h5py
+import numpy as np
+
 
 def parse_args():
     parser = ArgumentParser()

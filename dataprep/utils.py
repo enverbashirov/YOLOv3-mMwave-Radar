@@ -1,12 +1,13 @@
 import os
 import shutil
-import pandas as pd
-import matplotlib.pyplot as plt
-import matplotlib.patches as patches
 from dataclasses import dataclass, field
-import tensorflow as tf
 from typing import List
+
+import matplotlib.patches as patches
+import matplotlib.pyplot as plt
 import numpy as np
+import pandas as pd
+
 
 @dataclass
 class Cluster:
