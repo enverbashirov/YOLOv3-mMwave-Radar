@@ -40,10 +40,20 @@ def shift_rad2deg(angles):
     a = 180*a/np.pi
     return a
 
-def get_box(c, h=4, w=8):
-    # pass a center to this function to get a box centered there
-    return np.concatenate([c + np.array([-h/2, -w/2]).reshape(2, 1),
-                           c + np.array([h/2, w/2]).reshape(2, 1)], axis=0)
+def get_box(cluster, c=None, h=0.5, w=0.3):
+    if cluster is not None:
+        r_ext = cluster.elements[0].max() - cluster.elements[0].min()
+        # print(cluster.elements[1])
+        a_ext = cluster.elements[1].max() - cluster.elements[1].min()
+        out = np.array([cluster.center_polar[0].squeeze(),
+                        cluster.center_polar[1].squeeze(),
+                        r_ext,
+                        a_ext]).reshape(4, 1)
+        # print(out)
+        return out
+    else:
+        return np.array([c[0], c[1], h, w]).reshape(4, 1)
+
 
 def IOU_score(a, b):
 	# returns the IOU score of the two input boxes

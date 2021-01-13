@@ -19,24 +19,58 @@ def parse_args():
     parser.add_argument('path', help='Specify the path to the RDA maps')
     return parser.parse_args()
 
+def imaging(tracker, cluster, data, labels, full_indices):
+    flat_data = np.copy(data.ravel())
+    full_data = flat_data[full_indices]
+    full_data[labels != cluster.label] = 0 
+    flat_data[full_indices] = full_data
+    flat_data = flat_data.reshape(data.shape)
+    
+    print(flat_data.shape)
+    ra = flat_data.max(2)
+    rd = flat_data.max(1)
+    plt.subplot(121)
+    plt.imshow(rd, aspect='auto')
+    plt.subplot(122)
+    plt.imshow(ra, aspect='auto')
+    plt.colorbar()
+    plt.show()
+    plt.close()
+
 def plot(path, data_points, t_list, labels, action, index):
-    data_points = np.asarray([polar2cartesian(x) for x in data_points.T])
-    centers = np.array([kt.xy for kt in t_list])
+    # data_points = np.asarray([polar2cartesian(x) for x in data_points.T])
+    # data_points = np.expand_dims(data_points.T, -1)
+    # centers = np.array([kt.xy for kt in t_list])
+    centers = np.array([kt.rtheta for kt in t_list])
+    boxes = np.array([kt.box for kt in t_list])
 
     fig, ax = plt.subplots()
-    plt.scatter(data_points[:, 0, 0], data_points[:, 1, 0], marker='.', c=labels)
-    plt.xlabel(r'$x$ [m]')
-    plt.ylabel(r'$y$ [m]')
-    plt.grid()
-    plt.xlim([-6, 6])
-    plt.ylim([0, 10])
+    # ax.scatter(data_points[:, 1, 0], data_points[:, 0, 0], marker='.', c=labels)
+    ax.imshow(np.flipud(data_points.mean(2)), extent=(np.pi, 0, 0.5, 10))
+    # ax.xlabel(r'$x$ [m]')
+    # ax.ylabel(r'$y$ [m]')
+    ax.set_xlabel(r'$\theta$ [rad]')
+    ax.set_ylabel(r'$R$ [m]')
+    # ax.grid()
+    # ax.xlim([-6, 6])
+    # ax.xlim([0, np.pi])
+    # ax.ylim([0, 10])
     for i in range(len(centers)):
-        plt.scatter(centers[i, 0], centers[i, 1], marker='x', c='r')
-        cx = centers[i, 0]
-        cy = centers[i, 1]
-        plt.text(cx, cy + 0.5, '  Tr: {}, {}'.format(t_list[i].id, t_list[i].identity_label), fontdict={'color': 'red'})
-    plt.axvline(x=-1.70, linewidth=5, color='k')
-    plt.axvline(x=2.30, linewidth=5, color='k')
+        ax.scatter(centers[i, 1], centers[i, 0], marker='x', c='r')
+        ax.add_patch(patches.Rectangle((boxes[i, 1] - boxes[i, 3]/2, boxes[i, 0] - boxes[i, 2]/2),     # top left corner coordinates
+                        boxes[i, 3],       # width
+                        boxes[i, 2],       # height
+                        linewidth=1,
+                        edgecolor='r',
+                        facecolor='none'))
+        # ax.add_patch(patches.Rectangle((boxes[i, 0], boxes[i, 3]), 0.22, 0.1, 
+        #         fill=True, clip_on=False, linewidth=2, color='r'))
+        # ax.annotate(f'track {t_list[i].id}', (boxes[i, 0], boxes[i, 3]), color='w', ha='left', va='bottom')
+        # cx = centers[i, 0]
+        # cy = centers[i, 1]
+        # ax.text(cx, cy + 0.5, f' Tr: {t_list[i].id}', fontdict={'color': 'red'})
+    # ax.axvline(x=-1.70, linewidth=5, color='k')
+    # ax.axvline(x=2.30, linewidth=5, color='k')
 
     if action == 'save':
         plt.savefig(path + 'fig_{}'.format(index), format='png', dpi=250)
@@ -48,7 +82,7 @@ def plot(path, data_points, t_list, labels, action, index):
 
 if __name__ == '__main__':    
     folder = "final"
-    rawpath = f'save/jp/proc/'
+    rawpath = f'save/jp/proc/denoised/'
     savepath = f'save/jp/{folder}'
     savename = "truth"
     plotpath = "figs"
@@ -72,7 +106,7 @@ if __name__ == '__main__':
         start = 10
         # load RDA data, MUST have 4D shape: (N_range_bins, N_angle_bins, N_doppler_bins, N_timesteps)
         rda_data = np.load(f'{rawpath}/{fname}')[..., start:]
-        print(rda_data.shape)
+        # print(rda_data.shape)
         # path where to save the resulting figures
         # initialize clustering/tracker parameters
         MAX_AGE = 10
@@ -80,7 +114,7 @@ if __name__ == '__main__':
         MIN_PTS_THR = 30
         MIN_SAMPLES = 40
         EPS = 0.04
-        thr = 15
+        thr = 20
         assoc_score = 'Mahalanobis'                      # either 'IOU' or 'Mahalanobis'
         CLASS_CONF_THR = 0.0
         # init radar parameters
@@ -127,6 +161,10 @@ if __name__ == '__main__':
             print('Timestep {t}'.format(t=timestep+1), end='\r')
             # select RDA map of the current time-step
             data = rda_data[:, :, :, timestep]
+
+            # plt.imshow(data.max(2))
+            # plt.show()
+
             # compute normalized maps for DBSCAN
             norm_ang = (vang_deg - np.min(vang_deg)) / (np.max(vang_deg) - np.min(vang_deg))
             norm_vel = (v_vel - np.min(v_vel)) / (np.max(v_vel) - np.min(v_vel))
@@ -134,12 +172,16 @@ if __name__ == '__main__':
 
             rav_pts = np.asarray(np.meshgrid(vrange_ext, vang_deg, v_vel,  indexing='ij'))
             norm_rav_pts = np.asarray(np.meshgrid(norm_ran, norm_ang, norm_vel,  indexing='ij'))
-            # rav_pts = np.delete(rav_pts, np.arange(124, 132), axis=3)
-            # norm_rav_pts = np.delete(norm_rav_pts, np.arange(124, 132), axis=3)
+
             # select values which are over the threshold
-            data = data[arg_rmin:arg_rmax+1,:,:]
+            data = data[arg_rmin:arg_rmax + 1]
             full_indices = (data > thr)
             data[data < thr] = 0
+
+            # plt.imshow(data.max(2))
+            # plt.colorbar()
+            # plt.show()
+
             rav_pts = rav_pts[:, full_indices]
             power_values_full = data[full_indices]
             norm_rav_pts = norm_rav_pts[:, full_indices]
@@ -149,6 +191,15 @@ if __name__ == '__main__':
             ra_totrack[1] = deg2rad_shift(ra_totrack[1])
 
             normrav_pts_lin = norm_rav_pts.reshape(norm_rav_pts.shape[0], -1)
+
+            to_cartesian = np.stack([rav_pts[0]*np.cos(rav_pts[1]), rav_pts[0]*np.sin(rav_pts[1])], 0)
+            # print(to_cartesian.shape)
+            idx = np.logical_not((to_cartesian[0] > -1.70)*(to_cartesian[0] < 2.30))
+
+            ra_totrack = ra_totrack[..., idx]
+            rav_pts_lin = rav_pts_lin[..., idx]
+            normrav_pts_lin = normrav_pts_lin[..., idx]
+            power_values_full = power_values_full[..., idx]
 
             if rav_pts.shape[1] > MIN_SAMPLES:
                 # apply DBSCAN on normalized RDA map
@@ -180,7 +231,7 @@ if __name__ == '__main__':
                 new_cluster.center_polar = np.average(new_cluster.elements, weights=weights, axis=1).reshape(2, 1)
                 new_cluster.center_cartesian = np.array([new_cluster.center_polar[0]*np.cos(new_cluster.center_polar[1]), 
                                                         new_cluster.center_polar[0]*np.sin(new_cluster.center_polar[1])], dtype=np.float64).reshape(-1, 1)
-                new_cluster.box = get_box(c=new_cluster.center_cartesian)
+                new_cluster.box = get_box(new_cluster)
                 detected_clusters.append(new_cluster)
 
             if not timestep:    # happens only in the first time-step
@@ -219,9 +270,10 @@ if __name__ == '__main__':
                         # KF predict-update step
                         current_tracker.predict()
                         current_tracker.update(obs.reshape(2, 1))
-                        current_tracker.box = get_box(c=current_tracker.xy)
+                        current_tracker.box = get_box(detected_clusters[detec_idx])
                         current_tracker.hits += 1
                         current_tracker.misses_number = 0 
+                        # imaging(current_tracker, detected_clusters[detec_idx], data, labels, full_indices.ravel())
                 else:
                     print('No detections-tracks matches found! Skipping frame.')
                     continue
@@ -233,7 +285,7 @@ if __name__ == '__main__':
                 #         newc =  detected_clusters[idx].center_cartesian
                 #         new_tracker = KalmanTracker(id_=track_id_list.pop(0), s0=np.array([newc[0], 0, newc[1], 0], dtype=np.float64).reshape(-1, 1))
                 #         new_tracker.predict()
-                #         new_tracker.box = get_box(c=new_tracker.xy)
+                #         new_tracker.box = get_box(detected_clusters[idx])
                 #         tracking_list.append(new_tracker)
 
                 # deal with undetected tracks
@@ -243,7 +295,10 @@ if __name__ == '__main__':
                         old_tracker.misses_number += 1
                         # predict only as no obs is detected
                         old_tracker.predict()
-                        old_tracker.box = get_box(c=old_tracker.xy)
+                        old_tracker.box = get_box(None, 
+                                                  c=old_tracker.xy, 
+                                                  h=old_tracker.box[0],
+                                                  w=old_tracker.box[0])
                 # filter out tracks outside room borders (ghost targets)
                 tracking_list = [t for t in tracking_list if (t.xy[0] > -1.70) and (t.xy[0] < 2.30)]    # kill tracks outside the room boundaries
                 # select the valid tracks, i.e., the ones with less than the max. misses and enough hits
@@ -251,10 +306,10 @@ if __name__ == '__main__':
                 # continue
             
             # print(ra_totrack.shape, data.shape, len(labels))
-            finalname = f'{savepath}/{frawname}_{timestep+1}.npy'
-            rav_pts[1] = deg2rad_shift(rav_pts[1])
-            finalsave = np.insert(rav_pts.T, 3, labels, axis=1)
-            np.save(finalname, finalsave)
-            plot(f'{plotpath}/{frawname}_', ra_totrack, sel_tracking_list, labels, action, timestep)
+            # finalname = f'{savepath}/{frawname}_{timestep+1}.npy'
+            # rav_pts[1] = deg2rad_shift(rav_pts[1])
+            # finalsave = np.insert(rav_pts.T, 3, labels, axis=1)
+            # np.save(finalname, finalsave)
+            plot(f'{plotpath}/{frawname}_', data, sel_tracking_list, labels, action, timestep)
             # exit()
 

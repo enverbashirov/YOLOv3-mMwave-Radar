@@ -36,7 +36,7 @@ if __name__ == '__main__':
     NFFT = 2**10                                                             # number of fft points in range dim
     nr_chn = 16                                                              # number of channels
     # fft will be computed using a hannng window to lower border effects
-    win_range = np.broadcast_to(nuttall(N-1), (N_loop, nr_chn, N-1)).T    # integral of the window for normalization
+    win_range = np.broadcast_to(np.hanning(N-1), (N_loop, nr_chn, N-1)).T    # integral of the window for normalization
     print(win_range.shape)
     sca_win = np.sum(win_range[:, 0, 0])
 
@@ -51,7 +51,7 @@ if __name__ == '__main__':
 
     # # Doppler dimension
     NFFT_vel = 256                                                                    # number of fft points in angle dim
-    win_vel = np.broadcast_to(nuttall(N_loop).reshape(1, 1, -1), (vrange_ext.shape[0], nr_chn, N_loop))
+    win_vel = np.broadcast_to(np.hanning(N_loop).reshape(1, 1, -1), (vrange_ext.shape[0], nr_chn, N_loop))
     scawin_vel = np.sum(win_vel[0, 0, :])
     vfreq_vel = np.arange(-NFFT_vel/2, NFFT_vel/2)/NFFT_vel*(1/Tp)                    # vector of considered frequencies in Doppler dim
     v_vel = vfreq_vel*c0/(2*fc)                                                        # transform freqs into velocities
@@ -73,7 +73,7 @@ if __name__ == '__main__':
     # # # PROCESS THE RDA SLICES FOR EACH FRAME # # #
     folder = "jp"
     rawpath = f'save/{folder}/chext'
-    savepath = f'save/{folder}/proc'
+    savepath = f'save/{folder}/proc/'
     savename = "sub"
 
     # Create the subsequent save folders
@@ -81,6 +81,9 @@ if __name__ == '__main__':
         shutil.rmtree(savepath)
     if not os.path.isdir(savepath):
         os.makedirs(savepath)
+        os.mkdir(savepath + '/raw/')
+        os.mkdir(savepath + '/denoised/')
+        
 
     # sequences = [1, 2, 3, 4, 5, 6]   # this is just as an example, you should put here the ids of the sequences you want to process
     # sequences = range(0, len(os.listdir(rawpath)))   # this is just as an example, you should put here the ids of the sequences you want to process
@@ -91,11 +94,10 @@ if __name__ == '__main__':
         Data_orig = np.load(f'{rawpath}/{fname}')
         print('Original data shape: ', Data_orig.shape) 
 
-        parts = [0, 1, 2, 3, 4, 5, 6, 7]
-        SIDELOBE_LEVEL = 0.01
+        parts = [0, 1, 2, 3]
+        SIDELOBE_LEVEL = 3
         LINTHR_HIGH = -97
         LINTHR_LOW = -107                 
-        thr = 8   # or 15 
 
         for part in parts:                           # split processing in parts for memory, each track is split in 4
             savename = f'{frawname}_sub_{part}'
@@ -108,11 +110,11 @@ if __name__ == '__main__':
             
             nsteps = Data.shape[-1]        # last dim is time
             rda_data = np.zeros((len(vrange_ext), NFFT_ant, NFFT_vel, nsteps), dtype=np.float32)
-
+            raw_ra = np.zeros((len(vrange_ext), NFFT_ant, nsteps), dtype=np.float32)
             for j in range(nsteps):        # loop on the timesteps
                 print('Timestep: {t}'.format(t=j+1), end='\r')
                 RawRadarCube = Data[1:, :, :, j]
-                print(RawRadarCube.shape)
+                # print(RawRadarCube.shape)
                 # Range fft: window, calibration and scaling are applied
                 range_profile = np.fft.fft(RawRadarCube*win_range*mcal_data, NFFT, axis=0)*BrdFuSca/sca_win
                 rp_ext = range_profile[arg_rmin:arg_rmax+1]  # extract only ranges of interest (0 to 10 m)
@@ -131,23 +133,31 @@ if __name__ == '__main__':
                 # ax[1].imshow(range_angle_doppler.max(1))
                 # plt.show()
 
+                raw_ra[..., j] = range_angle_doppler.max(2)  # store raw range-angle image
+
                 # at this point you have the RDA representation and you can apply further denoising
                 rdep_thr = np.linspace(LINTHR_HIGH, LINTHR_LOW, range_angle_doppler.shape[0]).reshape((-1, 1, 1))
-                rdep_thr = np.broadcast_to(rdep_thr, (rdep_thr.shape[0], range_angle_doppler.shape[1], range_angle_doppler.shape[2]))
-
+                
                 range_angle_doppler -= rdep_thr
                 range_angle_doppler[range_angle_doppler < 0] = 0
 
                 maxs = np.max(range_angle_doppler, axis=1).reshape(range_angle_doppler.shape[0], 1, range_angle_doppler.shape[2])
+                # maxs = np.max(range_angle_doppler, axis=(0, 2)).reshape(1, range_angle_doppler.shape[1], 1)
                 threshold = maxs - SIDELOBE_LEVEL
-                rdep_thr_a = np.broadcast_to(threshold, (range_angle_doppler.shape[0], range_angle_doppler.shape[1], range_angle_doppler.shape[2]))
-                range_angle_doppler[range_angle_doppler < rdep_thr_a] = 0
+                range_angle_doppler[range_angle_doppler < threshold] = 0
 
-                rda_data[:, :, :, j] = range_angle_doppler
+                rda_data[..., j] = range_angle_doppler
 
-            np.save(f'{savepath}/{savename}.npy', np.asarray(rda_data))
-            print('Saved RDA shape: ', rda_data.shape)
-            del Data, rda_data, split_locs
+                # fig, ax = plt.subplots(1, 2)
+                # ax[0].imshow(range_angle_doppler.max(2))
+                # ax[1].imshow(range_angle_doppler.max(1))
+                # plt.show()
+
+            np.save(f'{savepath}/denoised/{savename}.npy', rda_data)
+            np.save(f'{savepath}/raw/{savename}.npy', raw_ra)
+            print('Saved denoised RDA shape: ', rda_data.shape)
+            print('Saved raw RA shape: ', raw_ra.shape)
+            del Data, rda_data, split_locs, raw_ra
             # sleep(3)
         del Data_orig
         # sleep(3)
