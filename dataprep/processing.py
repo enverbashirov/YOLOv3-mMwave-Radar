@@ -11,6 +11,8 @@ from mpl_toolkits.mplot3d import Axes3D
 from scipy import io, signal
 from scipy.signal.windows import nuttall, taylor
 
+from utils import *
+
 if __name__ == '__main__':
     # # # PARAMETERS INIT # # #
 
@@ -62,7 +64,9 @@ if __name__ == '__main__':
     win_ant = np.broadcast_to(taylor(nr_chn, nbar=20, sll=20).reshape(1,-1,1), (vrange_ext.shape[0], nr_chn, NFFT_vel))
     scawin_ant = np.sum(win_ant[0, :, 0])
     # win_ant = np.tile(win_ant, (len(vrange_ext), 1))
-    vang_deg = np.arcsin(2*np.arange(-NFFT_ant/2, NFFT_ant/2)/NFFT_ant)/np.pi*180     # vector of considered angles [-90, 90]
+    vang_deg = np.arcsin(2*np.arange(-NFFT_ant/2, NFFT_ant/2)/NFFT_ant)/np.pi*180     # vector of considered angles [-90, 90-dtheta]
+    # print(vang_deg)
+    # print(deg2rad_shift(vang_deg))
     
     # ant_idx = np.concatenate([np.arange(nr_chn), np.arange(nr_chn+1, 2*nr_chn)])      # indices of virtual antenna elements
     ant_idx = np.arange(nr_chn)

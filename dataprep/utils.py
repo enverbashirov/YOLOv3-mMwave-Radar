@@ -49,7 +49,6 @@ def get_box(cluster, c=None, h=0.5, w=0.3):
                         cluster.center_polar[1].squeeze(),
                         r_ext,
                         a_ext]).reshape(4, 1)
-        # print(out)
         return out
     else:
         return np.array([c[0], c[1], h, w]).reshape(4, 1)
