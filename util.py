@@ -103,11 +103,13 @@ def write_results(prediction, confidence, num_classes, nms_conf = 0.4):
 
     write = False
     
+    # We cannot vectorize NMS as there could be different number of true 
+    # detections per image thus we have to loop and look each image seperately once
     for ind in range(batch_size):
-        image_pred = prediction[ind]          #image Tensor
-        #confidence threshholding 
+        image_pred = prediction[ind]  #image Tensor
+        
+        #Confidence threshholding 
         #NMS
-    
         max_conf, max_conf_score = torch.max(image_pred[:,5:5+ num_classes], 1)
         max_conf = max_conf.float().unsqueeze(1)
         max_conf_score = max_conf_score.float().unsqueeze(1)
@@ -126,6 +128,7 @@ def write_results(prediction, confidence, num_classes, nms_conf = 0.4):
         #Get the various classes detected in the image
         img_classes = unique(image_pred_[:,-1])  # -1 index holds the class index
 
+        # Classwise NMS
         for cls in img_classes:
             #perform NMS
             #get the detections with one particular class
@@ -139,6 +142,7 @@ def write_results(prediction, confidence, num_classes, nms_conf = 0.4):
             image_pred_class = image_pred_class[conf_sort_index]
             idx = image_pred_class.size(0)   #Number of detections
             
+            # NMS computations
             for i in range(idx):
                 #Get the IOUs of all boxes that come after the one we are looking at 
                 #in the loop
