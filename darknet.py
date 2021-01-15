@@ -208,6 +208,7 @@ class Darknet(nn.Module):
         
                 #Transform 
                 x = x.data
+                print(x.shape)
                 x = predict_transform(x, inp_dim, anchors, num_classes, CUDA)
                 if not write:              #if no collector has been intialised. 
                     detections = x
@@ -306,3 +307,15 @@ class Darknet(nn.Module):
                 
                 conv_weights = conv_weights.view_as(conv.weight.data)
                 conv.weight.data.copy_(conv_weights)
+
+
+if __name__ == '__main__':
+
+    print(torch.cuda.is_available())
+
+    batch = torch.FloatTensor(np.zeros((64, 3, 224, 224)))
+
+    model = Darknet('cfg/yolov3.cfg')
+    print(model(batch, CUDA=True))
+    # print(model.net_info)
+    # print(model.module_list)
