@@ -11,7 +11,6 @@ test.py
 tempCodeRunnerFile.py
 test/
 data/
-
 .vscode/
 raw/
 
@@ -22,6 +21,8 @@ save/jp/*
 !save/jp2
 save/jp2/*
 # !save/jp2/final
+
+dog-cycle-car.png
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
