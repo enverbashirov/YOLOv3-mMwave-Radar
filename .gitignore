@@ -1,11 +1,12 @@
 # To be removed
+README.md
 yolov3.weights
 yolo
 yolo/*
 yolo.py
 
 # User-defined
-!.gitignore
+# !.gitignore
 test.py
 tempCodeRunnerFile.py
 test/

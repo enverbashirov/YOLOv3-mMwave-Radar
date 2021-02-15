@@ -23,6 +23,7 @@ if __name__ == '__main__':
     if not os.path.isdir(savepath):
         os.makedirs(savepath)
     
+    bb_dict = {}
     for i, fname in enumerate(os.listdir(rawpath + '/denoised')):
         print(fname)
         frawname = f'ra_{fname.split(".")[0].split("_")[1]}_{fname.split(".")[0].split("_")[3]}'
@@ -85,7 +86,6 @@ if __name__ == '__main__':
         tracking_list = []
 
         # loop over the time-steps
-        bb_dict = {}
         for timestep in range(rda_data.shape[-1]):
             print(f'Timestep {timestep + 1}', end='\r')
             # select RDA map of the current time-step
@@ -226,13 +226,11 @@ if __name__ == '__main__':
                  vrange_ext, 
                  vang_deg)
 
-            print(bb.shape)
             bb_dict[f'{frawname}_{timestep}'] = bb
 
             # if timestep == 3: 
             #     break
 
-        with open(f'{savepath}/{frawname}.pkl', 'wb') as handle:
-            pickle.dump(bb_dict, handle)
-            exit()
+    with open(f'labels.pkl', 'wb') as handle:
+        pickle.dump(bb_dict, handle)
 

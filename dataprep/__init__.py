@@ -82,7 +82,7 @@ def plot4train(path, data_points, noisy_ramap, t_list, action, ranges, angles):
     for i in range(len(boxes)):
         # # add pixel-level bb to ra image
         int_box = adjust_bb(boxes[i], ranges, angles)
-        add_bb(int_box, ax, t_list[i].id)
+        # add_bb(int_box, ax, t_list[i].id)
 
     if action == 'save':
         plt.savefig(path, format='png', dpi=32)

@@ -14,9 +14,13 @@ TO BE WRITTEN
 
 ## ChangeLog
 
+16.03.2021 - EB
+- Package ``yolo`` is added. ``yolo.py`` is the main network training file now.
+- Added ``cfg\yolotiny.cfg`` which is a smaller version of yolov3.
+
 15.02.2021 - EB
 - Pre-proccessing should be done.
-- Package ``dataprep`` is added. dataprep.py is the main data preparation file now.
+- Package ``dataprep`` is added. ``dataprep.py`` is the main data preparation file now.
 
 15.1.2021 - EB
 - Working on ``train.py`` which is the training module of the network.\
