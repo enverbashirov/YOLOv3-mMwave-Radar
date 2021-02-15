@@ -6,6 +6,8 @@ TO BE WRITTEN
 
 ## TODO
 
+15.02.2021 - EB
+
 15.1.2021 - EB
 - Get the mmwave data
 - Finish training input/output pipeline

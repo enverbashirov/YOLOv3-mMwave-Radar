@@ -3,7 +3,6 @@ import numpy as np
 import scipy as sp
 from matplotlib import pyplot as plt
 
-
 class KalmanTracker:
 
     def __init__(self, id_, s0=None, disable_rejection_check=False):
@@ -52,8 +51,8 @@ class KalmanTracker:
         return chi_squared >= self.REJECT_THR
 
     def predict(self):
-        a_x = np.random.normal(0, self.sigma_a)
-        a_y = np.random.normal(0, self.sigma_a)
+        # a_x = np.random.normal(0, self.sigma_a)
+        # a_y = np.random.normal(0, self.sigma_a)
         self.s = np.matmul(self.F, self.s) 
         # check that x has the correct shape
         assert self.s.shape == (self.n, 1)

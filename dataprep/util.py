@@ -8,7 +8,6 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
-
 @dataclass
 class Cluster:
     # cluster object, contains detected cluster points and additional values
@@ -81,7 +80,7 @@ class Supporter:
         # pathRawImages = "save/raw"
 
     def main(self):
-        for i, fname in enumerate(os.listdir(self.pathInput)):
+        for _, fname in enumerate(os.listdir(self.pathInput)):
             input = np.load(f'{self.pathInput}/{fname}')
             print(input.shape)
 

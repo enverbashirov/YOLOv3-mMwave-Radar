@@ -11,7 +11,7 @@ from mpl_toolkits.mplot3d import Axes3D
 from scipy import io, signal
 from scipy.signal.windows import nuttall, taylor
 
-from utils import *
+from util import *
 
 if __name__ == '__main__':
     # # # PARAMETERS INIT # # #
@@ -81,12 +81,12 @@ if __name__ == '__main__':
     savename = "sub"
 
     # Create the subsequent save folders
-    if os.path.isdir(savepath):
-        shutil.rmtree(savepath)
-    if not os.path.isdir(savepath):
-        os.makedirs(savepath)
-        os.mkdir(savepath + '/raw/')
-        os.mkdir(savepath + '/denoised/')
+    # if os.path.isdir(savepath):
+    #     shutil.rmtree(savepath)
+    # if not os.path.isdir(savepath):
+    #     os.makedirs(savepath)
+    #     os.mkdir(savepath + '/raw/')
+    #     os.mkdir(savepath + '/denoised/')
         
 
     # sequences = [1, 2, 3, 4, 5, 6]   # this is just as an example, you should put here the ids of the sequences you want to process
