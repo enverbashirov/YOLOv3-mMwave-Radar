@@ -6,17 +6,17 @@ TO BE WRITTEN
 
 ## TODO
 
-15.02.2021 - EB
-- Pre-proccessing should be done.
-- Package ``dataprep`` is added. dataprep.py is the main data preparation file now.
-
 15.1.2021 - EB
-- Get the mmwave data
-- Finish training input/output pipeline
+- Finish training input pipeline
 - Save the model and get the weights on mmwave data
+- Finish training output pipeline
 - Get output frames
 
 ## ChangeLog
+
+15.02.2021 - EB
+- Pre-proccessing should be done.
+- Package ``dataprep`` is added. dataprep.py is the main data preparation file now.
 
 15.1.2021 - EB
 - Working on ``train.py`` which is the training module of the network.\
