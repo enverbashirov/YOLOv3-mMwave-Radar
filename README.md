@@ -7,6 +7,8 @@ TO BE WRITTEN
 ## TODO
 
 15.02.2021 - EB
+- Pre-proccessing should be done.
+- Package ``dataprep`` is added. dataprep.py is the main data preparation file now.
 
 15.1.2021 - EB
 - Get the mmwave data

@@ -229,10 +229,10 @@ if __name__ == '__main__':
             print(bb.shape)
             bb_dict[f'{frawname}_{timestep}'] = bb
 
-            if timestep == 3: 
-                break
+            # if timestep == 3: 
+            #     break
 
-        with open(f'{savepath}/labels.pickle', 'wb') as handle:
+        with open(f'{savepath}/{frawname}.pkl', 'wb') as handle:
             pickle.dump(bb_dict, handle)
             exit()
 
