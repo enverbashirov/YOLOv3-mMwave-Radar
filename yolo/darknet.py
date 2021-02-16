@@ -1,12 +1,12 @@
 from __future__ import division
 
-import torch 
-import torch.nn as nn
-import torch.nn.functional as F 
+import torch, torch.nn as nn, torch.nn.functional as F 
 from torch.autograd import Variable
+
 import numpy as np
-from yolo.util import predict_transform
 import cv2
+
+from .util import *
 
 def get_test_input():
     img = cv2.imread("dog-cycle-car.png")
@@ -17,7 +17,7 @@ def get_test_input():
     img_ = Variable(img_)                     # Convert to Variable
     return img_
         
-def parse_cfg(self, cfgfile):
+def parse_cfg(cfgfile):
     """
     Takes a configuration file
     
@@ -48,7 +48,7 @@ def parse_cfg(self, cfgfile):
     
     return blocks
 
-def create_modules(self, blocks):
+def create_modules(blocks):
     net_info = blocks[0]     #Captures the information about the input and pre-processing    
     module_list = nn.ModuleList()
     prev_filters = 3

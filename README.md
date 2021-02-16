@@ -13,6 +13,11 @@ TO BE WRITTEN
 
 ## ChangeLog
 
+16.02.2021 - EB
+- yolotrain.py not quite working at the moment, almost there
+- bb are a part of the filename now
+- Dataset shuffling for train and test sets
+
 15.02.2021 - EB
 - Pre-proccessing should be done.
 - Package ``dataprep`` is added. ``dataprep.py`` is the main data preparation file now.

@@ -1,15 +1,12 @@
 import os, shutil, time
 from argparse import ArgumentParser
 
-import matplotlib
-import matplotlib.patches as patches
-import matplotlib.pyplot as plt
+import matplotlib, matplotlib.patches as patches, matplotlib.pyplot as plt
 from matplotlib import rc
 
 import numpy as np
 from sklearn.cluster import DBSCAN
 
-# "dataprep" package imports
 from .channel_extraction import ChannelExtraction
 from .util import Cluster, Supporter, polar2cartesian, cartesian2polar, \
     deg2rad_shift, shift_rad2deg, get_box, IOU_score
@@ -78,20 +75,18 @@ def plot4train(path, data_points, noisy_ramap, t_list, action, ranges, angles):
     ax.axis('off')
     ax.imshow(noisy_ramap, aspect='auto')
 
-    int_box = np.zeros((4, 1))
+    bb = np.zeros((4, 1))
     for i in range(len(boxes)):
         # # add pixel-level bb to ra image
-        int_box = adjust_bb(boxes[i], ranges, angles)
+        bb = adjust_bb(boxes[i], ranges, angles)
         # add_bb(int_box, ax, t_list[i].id)
 
     if action == 'save':
-        plt.savefig(path, format='png', dpi=32)
-        plt.close()
+        bb = bb.astype(int)
+        plt.savefig(f'{path}_[{bb[0][0]},{bb[1][0]},{bb[2][0]},{bb[3][0]}]', format='png', dpi=32)
     elif action == 'plot':
         plt.show()
-        plt.close()
-    
-    return int_box
+    plt.close()
 
 def add_bb(bb, ax, note):
     ax.add_patch(patches.Rectangle((bb[1] - bb[3]/2, bb[0] - bb[2]/2),     # top left corner coordinates

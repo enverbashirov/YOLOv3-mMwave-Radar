@@ -8,8 +8,8 @@ from matplotlib import pyplot as plt
 from matplotlib import rc
 from sklearn.cluster import DBSCAN
 
-from dataprep import *
-from dataprep import deg2rad_shift, Cluster, get_box, KalmanTracker, plot, plot4train
+# from dataprep import *
+from dataprep import deg2rad_shift, Cluster, get_box, KalmanTracker, plot, plot4train, adjust_bb
 
 if __name__ == '__main__':    
     folder = "final"
@@ -18,12 +18,11 @@ if __name__ == '__main__':
     plotpath = "save/jp/final/"
 
     # Create the subsequent save folders
-    if os.path.isdir(savepath):
-        shutil.rmtree(savepath)
-    if not os.path.isdir(savepath):
-        os.makedirs(savepath)
+    # if os.path.isdir(savepath):
+    #     shutil.rmtree(savepath)
+    # if not os.path.isdir(savepath):
+    #     os.makedirs(savepath)
     
-    bb_dict = {}
     for i, fname in enumerate(os.listdir(rawpath + '/denoised')):
         print(fname)
         frawname = f'ra_{fname.split(".")[0].split("_")[1]}_{fname.split(".")[0].split("_")[3]}'
@@ -218,19 +217,10 @@ if __name__ == '__main__':
                 # select the valid tracks, i.e., the ones with less than the max. misses and enough hits
                 sel_tracking_list = [t for t in tracking_list if (t.misses_number <= MAX_AGE) and (t.hits >= MIN_DET_NUMBER)]
 
-            bb = plot4train(f'{savepath}/{frawname}_{timestep}', 
+            plot4train(f'{savepath}/{frawname}_{timestep}', 
                  data,
                  raw_ra,
                  sel_tracking_list, 
                  action, 
                  vrange_ext, 
                  vang_deg)
-
-            bb_dict[f'{frawname}_{timestep}'] = bb
-
-            # if timestep == 3: 
-            #     break
-
-    with open(f'{savepath}/labels.pkl', 'wb') as handle:
-        pickle.dump(bb_dict, handle)
-

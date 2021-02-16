@@ -5,29 +5,26 @@ import torch.optim as optim
 import torchvision
 import torchvision.transforms as transforms
 
-from .darknet import *
+from yolo import *
+# from yolo import parse_cfg, create_modules, Darknet
 
-# dataset
+dataPath = "save/jp/final"
+
 transform = transforms.Compose(
     [transforms.ToTensor(),
      transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))])
 
-dataPath = "figs/processed/"
 # If running on Windows and you get a BrokenPipeError, try setting
 # the num_worker of torch.utils.data.DataLoader() to 0.
-trainset = torchvision.datasets.CIFAR10(root=dataPath, train=True,
-                                        download=False, transform=transform)
-trainloader = torch.utils.data.DataLoader(trainset, batch_size=4,
-                                          shuffle=True, num_workers=2)
-
-testset = torchvision.datasets.CIFAR10(root=dataPath, train=False,
-                                       download=False, transform=transform)
-testloader = torch.utils.data.DataLoader(testset, batch_size=4,
-                                         shuffle=False, num_workers=2)
+trainset = MmwaveDataset(data_dir = dataPath, transforms = None)
+trainloader = torch.utils.data.DataLoader(trainset, batch_size=128, shuffle=True, num_workers=2)
+testset = MmwaveDataset(data_dir = dataPath, transforms=None)
+testloader = torch.utils.data.DataLoader(testset, batch_size=128, shuffle=True, num_workers=2)
 
 # Define the network
-_, net = create_modules(parse_cfg("../cfg/yolovtiny.cfg"))
-# print(model)
+model, net = create_modules(parse_cfg("cfg/yolov3tiny.cfg"))
+# print(net)
+
 criterion = nn.CrossEntropyLoss()
 optimizer = optim.SGD(net.parameters(), lr=0.001, momentum=0.9)
 

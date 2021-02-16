@@ -12,14 +12,12 @@ tempCodeRunnerFile.py
 test/
 data/
 .vscode/
-raw/
 
+# raw/
+raw/*/*
 figs/
-save/
-!save/jp
-save/jp/*
-!save/jp2
-save/jp2/*
+# save/
+save/*/*
 
 dog-cycle-car.png
 

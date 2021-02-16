@@ -1,18 +1,16 @@
 from __future__ import division
+
 import time
-import torch 
-import torch.nn as nn
+import os, os.path as osp
+import torch, torch.nn as nn
+# import torch.nn as nn
 from torch.autograd import Variable
 import numpy as np
-import cv2 
+import cv2
+import random, argparse, pickle as pkl, pandas as pd
+
+from .darknet import Darknet
 from .util import *
-import argparse
-import os 
-import os.path as osp
-from darknet import Darknet
-import pickle as pkl
-import pandas as pd
-import random
 
 def arg_parse():
     """
