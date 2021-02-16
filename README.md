@@ -6,7 +6,6 @@ TO BE WRITTEN
 
 ## TODO
 
-15.1.2021 - EB
 - Finish training input pipeline
 - Save the model and get the weights on mmwave data
 - Finish training output pipeline

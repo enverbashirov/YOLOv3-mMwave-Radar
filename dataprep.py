@@ -231,6 +231,6 @@ if __name__ == '__main__':
             # if timestep == 3: 
             #     break
 
-    with open(f'labels.pkl', 'wb') as handle:
+    with open(f'{savepath}/labels.pkl', 'wb') as handle:
         pickle.dump(bb_dict, handle)
 
