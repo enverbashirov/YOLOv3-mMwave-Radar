@@ -6,10 +6,6 @@ TO BE WRITTEN
 
 ## TODO
 
-<<<<<<< HEAD
-=======
-15.02.2021 - EB
->>>>>>> d43710c3d70724f8f83999e359089cdd0f00d975
 - Finish training input pipeline
 - Save the model and get the weights on mmwave data
 - Finish training output pipeline
