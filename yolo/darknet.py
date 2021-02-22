@@ -48,6 +48,15 @@ def parse_cfg(cfgfile):
     
     return blocks
 
+class EmptyLayer(nn.Module):
+    def __init__(self):
+        super(EmptyLayer, self).__init__()
+        
+class DetectionLayer(nn.Module):
+    def __init__(self, anchors):
+        super(DetectionLayer, self).__init__()
+        self.anchors = anchors
+
 def create_modules(blocks):
     net_info = blocks[0]     #Captures the information about the input and pre-processing    
     module_list = nn.ModuleList()
@@ -150,15 +159,6 @@ def create_modules(blocks):
         
     return (net_info, module_list)
 
-class EmptyLayer(nn.Module):
-    def __init__(self):
-        super(EmptyLayer, self).__init__()
-        
-class DetectionLayer(nn.Module):
-    def __init__(self, anchors):
-        super(DetectionLayer, self).__init__()
-        self.anchors = anchors
-
 class Darknet(nn.Module):
     def __init__(self, cfgfile):
         super(Darknet, self).__init__()
@@ -211,7 +211,7 @@ class Darknet(nn.Module):
                 x = x.data
                 print(x.shape)
                 x = predict_transform(x, inp_dim, anchors, num_classes, CUDA)
-                if not write:              #if no collector has been intialised. 
+                if not write: #if no collector has been intialised. 
                     detections = x
                     write = 1
         

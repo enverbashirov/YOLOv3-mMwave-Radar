@@ -20,7 +20,6 @@ class MmwaveDataset(torch.utils.data.Dataset):
         files = os.listdir(data_dir)
         files = [os.path.join(data_dir,x) for x in files]
         
-        
         if data_size < 0 or data_size > len(files):
             assert("Data size should be between 0 to number of files in the dataset")
         
@@ -38,10 +37,10 @@ class MmwaveDataset(torch.utils.data.Dataset):
         image_address = self.files[idx]
         image = Image.open(image_address)
         image = self.preprocess(image)
-        # get the bb info from the filename
-        labels_str = image_address.split("_")[-1].split('[')[1].split(']')[0].split(',')
-        # convert bb info to int array
-        labels = [int(a) for a in labels_str]
+        
+        labels_str = image_address.split("_") \
+            [-1].split('[')[1].split(']')[0].split(',') # get the bb info from the filename
+        labels = np.array([int(a) for a in labels_str]) # convert bb info to int array
         
         image = image.astype(np.float32)
         

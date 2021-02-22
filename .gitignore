@@ -14,10 +14,10 @@ data/
 .vscode/
 
 # raw/
-raw/*/*
+raw/
 figs/
 # save/
-save/*/*
+save/
 
 dog-cycle-car.png
 
