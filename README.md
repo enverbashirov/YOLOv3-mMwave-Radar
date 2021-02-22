@@ -6,15 +6,19 @@ TO BE WRITTEN
 
 ## TODO
 
-- Finish training input pipeline
+- Input pipeline
 - Save the model and get the weights on mmwave data
-- Finish training output pipeline
+- Output pipeline
 - Get output frames
 
 ## ChangeLog
 
+22.02.2021 - EB
+- Input doesn't match the parameter size for some reason
+- Rest of the input pipelining is done!
+
 16.02.2021 - EB
-- yolotrain.py not quite working at the moment, almost there
+- ``yolotrain.py`` not quite working at the moment, almost there
 - bb are a part of the filename now
 - Dataset shuffling for train and test sets
 

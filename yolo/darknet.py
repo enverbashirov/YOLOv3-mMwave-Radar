@@ -58,7 +58,7 @@ class DetectionLayer(nn.Module):
         self.anchors = anchors
 
 def create_modules(blocks):
-    net_info = blocks[0]     #Captures the information about the input and pre-processing    
+    net_info = blocks[0]   #Captures the information about the input and pre-processing    
     module_list = nn.ModuleList()
     prev_filters = 3
     output_filters = []
@@ -159,11 +159,11 @@ def create_modules(blocks):
         
     return (net_info, module_list)
 
-class Darknet(nn.Module):
+class DarkNet(nn.Module):
     def __init__(self, cfgfile):
-        super(Darknet, self).__init__()
-        self.blocks = self.parse_cfg(cfgfile)
-        self.net_info, self.module_list = self.create_modules(self.blocks)
+        super(DarkNet, self).__init__()
+        self.blocks = parse_cfg(cfgfile)
+        self.net_info, self.module_list = create_modules(self.blocks)
 
     def forward(self, x, CUDA):
         modules = self.blocks[1:]

@@ -10,13 +10,9 @@ import pickle, os, time, random
 from PIL import Image
 
 from yolo import *
-# from yolo import parse_cfg, create_modules, Darknet
+# from yolo import parse_cfg, create_modules, DarkNet
 
 dataPath = "save/jp/final"
-
-# transform = transforms.Compose(
-#     [transforms.ToTensor(),
-#      transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))])
 
 # If running on Windows and you get a BrokenPipeError, try setting
 # the num_worker of torch.utils.data.DataLoader() to 0.
@@ -26,20 +22,20 @@ testset = MmwaveDataset(data_dir = dataPath, transforms=None)
 testloader = torch.utils.data.DataLoader(testset, batch_size=8, shuffle=True, num_workers=2)
 
 # Define the network
-model, net = create_modules(parse_cfg("cfg/yolov3tiny.cfg"))
+# model, net = create_modules(parse_cfg("cfg/yolov3tiny.cfg"))
+net = DarkNet("cfg/yolov3tiny.cfg")
 
 # Use GPU if available
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-# print(device)
-net.to(device) # Put the network on GPU if available
+net.to(device) # Put the network on device
 
 criterion = nn.CrossEntropyLoss()
 optimizer = optim.SGD(net.parameters(), lr=0.001, momentum=0.9)
+
 # hyperparameters
 scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, milestones=[150, 200], gamma=0.1)
 
 for epoch in range(10):  # loop over the dataset multiple times
-
     losses = []
     
     # Train
@@ -49,11 +45,9 @@ for epoch in range(10):  # loop over the dataset multiple times
         inputs = inputs.to(device)
         targets = targets.to(device)
 
-        # print(inputs.shape)
-        # exit()
         optimizer.zero_grad()
 
-        outputs = net(inputs)
+        outputs = net(inputs, torch.cuda.is_available())
         loss = criterion(outputs, targets)
         loss.backward()
 

@@ -9,7 +9,7 @@ import numpy as np
 from PIL import Image
 
 from .darknet import get_test_input, parse_cfg, create_modules, \
-    EmptyLayer, DetectionLayer, Darknet
+    EmptyLayer, DetectionLayer, DarkNet
 from .util import unique, bbox_iou, predict_transform, write_results, \
     letterbox_image, prep_image, load_classes
 # from .detect import *
@@ -43,7 +43,7 @@ class MmwaveDataset(torch.utils.data.Dataset):
         labels = np.array([int(a) for a in labels_str]) # convert bb info to int array
         
         image = image.astype(np.float32)
-        
+
         if self.transforms:
             image = self.transforms(image)
 
@@ -51,5 +51,5 @@ class MmwaveDataset(torch.utils.data.Dataset):
 
     #Image preprocessing before feeding to network
     def preprocess(self, image):
-        image = np.array(image)
+        image = np.array(image.convert('RGB'))
         return image.transpose(2,1,0)

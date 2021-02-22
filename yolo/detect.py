@@ -9,7 +9,7 @@ import numpy as np
 import cv2
 import random, argparse, pickle as pkl, pandas as pd
 
-from .darknet import Darknet
+from .darknet import DarkNet
 from .util import *
 
 def arg_parse():
@@ -53,7 +53,7 @@ classes = load_classes("data/coco.names")
 
 #Set up the neural network
 print("Loading network.....")
-model = Darknet(args.cfgfile)
+model = DarkNet(args.cfgfile)
 model.load_weights(args.weightsfile)
 print("Network successfully loaded")
 
