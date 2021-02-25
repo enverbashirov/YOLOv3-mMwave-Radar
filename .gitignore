@@ -3,6 +3,7 @@
 # yolo
 # yolo/*
 yolov3.weights
+cfg/yolov3test.cfg
 yolo.py
 
 # User-defined

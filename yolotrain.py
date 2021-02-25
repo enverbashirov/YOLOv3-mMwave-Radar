@@ -23,7 +23,8 @@ testloader = torch.utils.data.DataLoader(testset, batch_size=8, shuffle=True, nu
 
 # Define the network
 # model, net = create_modules(parse_cfg("cfg/yolov3tiny.cfg"))
-net = DarkNet("cfg/yolov3tiny.cfg")
+net = DarkNet("cfg/yolov3test.cfg")
+print(net.net_info)
 
 # Use GPU if available
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
@@ -49,7 +50,7 @@ for epoch in range(10):  # loop over the dataset multiple times
 
         outputs = net(inputs, torch.cuda.is_available())
         loss = criterion(outputs, targets)
-        loss.backward()
+        # loss.backward()
 
         optimizer.step()
         losses.append(loss.item())
@@ -72,7 +73,7 @@ for epoch in range(10):  # loop over the dataset multiple times
       for batch_idx, (inputs, targets) in enumerate(testloader):
           inputs, targets = inputs.to(device), targets.to(device)
 
-          outputs = net(inputs)
+          s = net(inputs, torch.cuda.is_available())
           _, predicted = torch.max(outputs.data, 1)
           total += targets.size(0)
           correct += predicted.eq(targets.data).cpu().sum()
@@ -81,6 +82,6 @@ for epoch in range(10):  # loop over the dataset multiple times
       print('--------------------------------------------------------------')
     net.train()  
         
-torch.save(net.state_dict(), './yolommwave_net.pth')
+torch.save(net.state_dict(), 'test/yolommwave_net.pth')
 
 

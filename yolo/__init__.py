@@ -41,7 +41,8 @@ class MmwaveDataset(torch.utils.data.Dataset):
         labels_str = image_address.split("_") \
             [-1].split('[')[1].split(']')[0].split(',') # get the bb info from the filename
         labels = np.array([int(a) for a in labels_str]) # convert bb info to int array
-        
+        labels = np.append(labels, 1)
+
         image = image.astype(np.float32)
 
         if self.transforms:

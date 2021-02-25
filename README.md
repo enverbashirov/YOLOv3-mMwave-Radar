@@ -6,12 +6,18 @@ TO BE WRITTEN
 
 ## TODO
 
-- Input pipeline
-- Save the model and get the weights on mmwave data
-- Output pipeline
-- Get output frames
+[x] Input pipeline
+[x] Network training (a working version)
+[ ] Save the model and get the weights on mmwave data
+[ ] Output pipeline
+[ ] Detection on an input
 
 ## ChangeLog
+
+25.02.2021 - EB
+- Training is done
+- Didn't remove classes after all. Now there is only 1 class (person)
+- Need some work on the network to raise the results
 
 22.02.2021 - EB
 - Input doesn't match the parameter size for some reason

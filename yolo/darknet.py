@@ -174,8 +174,9 @@ class DarkNet(nn.Module):
             module_type = (module["type"])
             
             if module_type == "convolutional" or module_type == "upsample":
+                # if self.blocks[i]['type'] == 'yolo':
                 x = self.module_list[i](x)
-    
+
             elif module_type == "route":
                 layers = module["layers"]
                 layers = [int(a) for a in layers]
@@ -207,9 +208,8 @@ class DarkNet(nn.Module):
                 #Get the number of classes
                 num_classes = int (module["classes"])
         
-                #Transform 
+                #Transform
                 x = x.data
-                print(x.shape)
                 x = predict_transform(x, inp_dim, anchors, num_classes, CUDA)
                 if not write: #if no collector has been intialised. 
                     detections = x
@@ -217,9 +217,12 @@ class DarkNet(nn.Module):
         
                 else:       
                     detections = torch.cat((detections, x), 1)
+
+                # print(module_type, x.shape)
         
+            # print(i, module_type, x.shape)
             outputs[i] = x
-        
+
         return detections
 
     def load_weights(self, weightfile):
