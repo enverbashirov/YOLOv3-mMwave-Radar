@@ -22,8 +22,7 @@ testset = MmwaveDataset(data_dir = dataPath, transforms=None)
 testloader = torch.utils.data.DataLoader(testset, batch_size=8, shuffle=True, num_workers=2)
 
 # Define the network
-# model, net = create_modules(parse_cfg("cfg/yolov3tiny.cfg"))
-net = DarkNet("cfg/yolov3test.cfg")
+net = DarkNet("cfg/yolov3tiny.cfg")
 print(net.net_info)
 
 # Use GPU if available
