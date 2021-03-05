@@ -10,7 +10,6 @@ import pickle, os, time, random
 from PIL import Image
 
 from yolo import *
-# from yolo import parse_cfg, create_modules, DarkNet
 
 dataPath = "save/jp/final"
 
@@ -21,35 +20,58 @@ trainloader = torch.utils.data.DataLoader(trainset, batch_size=8, shuffle=True, 
 testset = MmwaveDataset(data_dir = dataPath, transforms=None)
 testloader = torch.utils.data.DataLoader(testset, batch_size=8, shuffle=True, num_workers=2)
 
+# model, net = create_modules(parse_cfg("cfg/yolov3tiny.cfg"))
+# print(net)
+# exit()
+
 # Define the network
 net = DarkNet("cfg/yolov3tiny.cfg")
-print(net.net_info)
+# print(net.net_info)
 
 # Use GPU if available
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 net.to(device) # Put the network on device
 
-criterion = nn.CrossEntropyLoss()
+# for param in net.parameters():
+#     param.requires_grad = True
+
+criterion = YOLOLoss()
+# criterion = nn.MSELoss(reduction='mean')
 optimizer = optim.SGD(net.parameters(), lr=0.001, momentum=0.9)
 
 # hyperparameters
 scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, milestones=[150, 200], gamma=0.1)
 
+# TRAIN
 for epoch in range(10):  # loop over the dataset multiple times
     losses = []
     
-    # Train
     start = time.time()
     for batch_idx, (inputs, targets) in enumerate(trainloader):
-
         inputs = inputs.to(device)
         targets = targets.to(device)
+        print(targets)
+        
+        outputs = net(inputs, torch.cuda.is_available())
+        # predictions = write_results(
+        #     prediction = outputs,   # net output 
+        #     confidence = 0.5,       # confidence threshold
+        #     num_classes = 1,        # person (so 1) 
+        #     nms_conf = 0.4          # Non-Max Suppression threshold
+        #     )
+        # print(predictions.shape)
+        exit()
 
+        # compute gradients for all output params 
+        # (could be modified for only specific params)
+        outputs.requires_grad = True
+
+        # clear the grads from prev passes
         optimizer.zero_grad()
 
-        outputs = net(inputs, torch.cuda.is_available())
+        # compute dloss/dx for every requires_grad=True
         loss = criterion(outputs, targets)
-        # loss.backward()
+        loss.backward()
 
         optimizer.step()
         losses.append(loss.item())
@@ -82,5 +104,3 @@ for epoch in range(10):  # loop over the dataset multiple times
     net.train()  
         
 torch.save(net.state_dict(), 'test/yolommwave_net.pth')
-
-

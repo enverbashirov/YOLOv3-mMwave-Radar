@@ -172,6 +172,7 @@ class DarkNet(nn.Module):
         write = 0
         for i, module in enumerate(modules):        
             module_type = (module["type"])
+            # print(module)
             
             if module_type == "convolutional" or module_type == "upsample":
                 # if self.blocks[i]['type'] == 'yolo':
@@ -217,10 +218,8 @@ class DarkNet(nn.Module):
         
                 else:       
                     detections = torch.cat((detections, x), 1)
-
-                # print(module_type, x.shape)
         
-            # print(i, module_type, x.shape)
+            print(i, module_type, x.shape)
             outputs[i] = x
 
         return detections
