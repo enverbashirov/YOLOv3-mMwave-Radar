@@ -16,10 +16,14 @@ def unique(tensor):
     tensor_res.copy_(unique_tensor)
     return tensor_res
 
-def bbox_iou(box1, box2):
-    """
-    Returns the IoU of two bounding boxes 
-    """
+def IoU(box1, box2):
+    """ Compute IoU between box1 and box2 """
+
+    if box1.is_cuda == True:
+        box1 = box1.cpu()
+    if box2.is_cuda == True:
+        box2 = box2.cpu()
+
     #Get the coordinates of bounding boxes
     b1_x1, b1_y1, b1_x2, b1_y2 = box1[:,0], box1[:,1], box1[:,2], box1[:,3]
     b2_x1, b2_y1, b2_x2, b2_y2 = box2[:,0], box2[:,1], box2[:,2], box2[:,3]
@@ -196,7 +200,7 @@ def write_results(prediction, confidence, num_classes, nms_conf = 0.4):
                 #Get the IOUs of all boxes that come after the one we are looking at 
                 #in the loop
                 try:
-                    ious = bbox_iou(image_pred_class[i].unsqueeze(0), image_pred_class[i+1:])
+                    ious = IoU(image_pred_class[i].unsqueeze(0), image_pred_class[i+1:])
                 except ValueError:
                     break
             
@@ -255,3 +259,47 @@ def load_classes(namesfile):
     fp = open(namesfile, "r")
     names = fp.read().split("\n")[:-1]
     return names
+
+def xywh2xyxy(bbox):
+    bbox_ = bbox.clone()
+    if len(bbox_.size()) == 1:
+        bbox_ = bbox_.unsqueeze(0)
+    xc, yc = bbox_[..., 0], bbox_[..., 1]
+    half_w, half_h = bbox_[..., 2] / 2, bbox_[..., 3] / 2
+    bbox_[..., 0] = xc - half_w
+    bbox_[..., 1] = yc - half_h
+    bbox_[..., 2] = xc + 2 * half_w
+    bbox_[..., 3] = yc + 2 * half_h
+    return bbox_
+    
+def parse_cfg(cfgfile):
+    """
+    Takes a configuration file
+    
+    Returns a list of blocks. Each blocks describes a block in the neural
+    network to be built. Block is represented as a dictionary in the list
+    
+    """
+    
+    file = open(cfgfile, 'r')
+    lines = file.read().split('\n')                        # store the lines in a list
+    lines = [x for x in lines if len(x) > 0]               # get read of the empty lines 
+    lines = [x for x in lines if x[0] != '#']              # get rid of comments
+    lines = [x.rstrip().lstrip() for x in lines]           # get rid of fringe whitespaces
+    file.close()
+    
+    block = {}
+    blocks = []
+    
+    for line in lines:
+        if line[0] == "[":               # This marks the start of a new block
+            if len(block) != 0:          # If block is not empty, implies it is storing values of previous block.
+                blocks.append(block)     # add it the blocks list
+                block = {}               # re-init the block
+            block["type"] = line[1:-1].rstrip()     
+        else:
+            key,value = line.split("=") 
+            block[key.rstrip()] = value.lstrip()
+    blocks.append(block)
+    
+    return blocks

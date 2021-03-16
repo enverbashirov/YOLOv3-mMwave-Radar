@@ -26,7 +26,8 @@ testloader = torch.utils.data.DataLoader(testset, batch_size=4,
                                          shuffle=False, num_workers=2)
 
 # Define the network
-_, net = create_modules(parse_cfg("../cfg/yolovtiny.cfg"))
+_, net = DarkNet(mycfgdir, myreso)
+
 # print(model)
 criterion = nn.CrossEntropyLoss()
 optimizer = optim.SGD(net.parameters(), lr=0.001, momentum=0.9)

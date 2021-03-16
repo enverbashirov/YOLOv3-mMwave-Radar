@@ -11,6 +11,10 @@ from PIL import Image
 
 from yolo import *
 
+# CONSTANTS
+mycfgdir = "cfg/yolovtiny.cfg"
+myreso = 416
+
 dataPath = "save/jp/final"
 
 # If running on Windows and you get a BrokenPipeError, try setting
@@ -20,23 +24,16 @@ trainloader = torch.utils.data.DataLoader(trainset, batch_size=8, shuffle=True, 
 testset = MmwaveDataset(data_dir = dataPath, transforms=None)
 testloader = torch.utils.data.DataLoader(testset, batch_size=8, shuffle=True, num_workers=2)
 
-# model, net = create_modules(parse_cfg("cfg/yolov3tiny.cfg"))
-# print(net)
-# exit()
-
 # Define the network
-net = DarkNet("cfg/yolov3tiny.cfg")
-# print(net.net_info)
+net = DarkNet("cfg/yolov3tiny.cfg", myreso)
+net.train(True)
 
 # Use GPU if available
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 net.to(device) # Put the network on device
 
-# for param in net.parameters():
-#     param.requires_grad = True
-
-criterion = YOLOLoss()
-# criterion = nn.MSELoss(reduction='mean')
+criterion = nn.MSELoss(reduction='mean')
+# criterion = YOLOLoss()
 optimizer = optim.SGD(net.parameters(), lr=0.001, momentum=0.9)
 
 # hyperparameters
@@ -50,16 +47,11 @@ for epoch in range(10):  # loop over the dataset multiple times
     for batch_idx, (inputs, targets) in enumerate(trainloader):
         inputs = inputs.to(device)
         targets = targets.to(device)
-        print(targets)
+        # print(inputs.size())
+        # print(targets.size())
         
-        outputs = net(inputs, torch.cuda.is_available())
-        # predictions = write_results(
-        #     prediction = outputs,   # net output 
-        #     confidence = 0.5,       # confidence threshold
-        #     num_classes = 1,        # person (so 1) 
-        #     nms_conf = 0.4          # Non-Max Suppression threshold
-        #     )
-        # print(predictions.shape)
+        outputs = net(inputs, targets, device)
+        print(outputs.size())
         exit()
 
         # compute gradients for all output params 
@@ -94,7 +86,7 @@ for epoch in range(10):  # loop over the dataset multiple times
       for batch_idx, (inputs, targets) in enumerate(testloader):
           inputs, targets = inputs.to(device), targets.to(device)
 
-          s = net(inputs, torch.cuda.is_available())
+          s = net(inputs, device)
           _, predicted = torch.max(outputs.data, 1)
           total += targets.size(0)
           correct += predicted.eq(targets.data).cpu().sum()

@@ -3,7 +3,6 @@ from __future__ import division
 import time
 import os, os.path as osp
 import torch, torch.nn as nn
-# import torch.nn as nn
 from torch.autograd import Variable
 import numpy as np
 import cv2

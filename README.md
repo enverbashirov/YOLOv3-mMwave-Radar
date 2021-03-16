@@ -6,11 +6,16 @@ Some Sources
 
 [YOLOv3: An Incremental Improvement (paper)](https://arxiv.org/abs/1804.02767)
 
+[YOLOv3 PyTorch](https://github.com/ecr23xx/yolov3.pytorch/blob/master/src/layers.py)
+
 [YOLOv3 PyTorch (detection)](https://blog.paperspace.com/how-to-implement-a-yolo-object-detector-in-pytorch/)
 
-[YOLOv3 Tensorflow (train/detection)](https://towardsdatascience.com/dive-really-deep-into-yolo-v3-a-beginners-guide-9e3d2666280e)
-
 [PyTorch Network Tranining Tutorial](https://pytorch.org/tutorials/beginner/blitz/cifar10_tutorial.html)
+
+[YOLOv3 Tensorflow](https://github.com/qqwweee/keras-yolo3/blob/master/yolo3/model.py)
+
+[YOLOv3 Tensorflow (alternative)](https://towardsdatascience.com/dive-really-deep-into-yolo-v3-a-beginners-guide-9e3d2666280e)
+
 
 
 - FOLDER STRUCTURE
@@ -50,6 +55,13 @@ Some Sources
 - [ ] Check if network output bounding box attrbutes are relative to the center of the prediction
 
 ## ChangeLog
+
+16.03.2021 - EB
+- Minor issue/bug on label dimensions to loss function. There is a miss-match.
+- Everything should be tested...
+- Non-training seems to be working
+- [x] `YOLOLoss()`: Loss function
+- [x] `NMSLayer()`: Non-max suppression
 
 05.03.2021 - EB
 - Working `torch.autograd` and `loss.backward()`
