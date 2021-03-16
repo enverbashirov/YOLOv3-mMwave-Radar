@@ -78,17 +78,19 @@ class YOLOLayer(nn.Module):
             pred[..., :4] *= stride
             return pred.view(bs, -1, num_attrs)
         else:
-            loss = YOLOLoss([bs, nA, gs], scaled_anchors, pred, [pred_tx, pred_ty, pred_tw, pred_th])
-            return loss(x, y_true)
+            loss = YOLOLoss([bs, nA, gs], scaled_anchors, self.num_classes, pred, [pred_tx, pred_ty, pred_tw, pred_th])
+            loss = loss(x, y_true)
+            return loss
 
 # YOLOv3 Loss
 class YOLOLoss(nn.Module):
-    def __init__(self, shape, scaled_anchors, pred, pred_t):
+    def __init__(self, shape, scaled_anchors, num_classes, pred, pred_t):
         super(YOLOLoss, self).__init__()
         self.bs = shape[0]
         self.nA = shape[1]
         self.gs = shape[2]
         self.scaled_anchors = scaled_anchors
+        self.num_classes = num_classes
         self.predictions = pred
         self.pred_conf = pred[..., 4]
         self.pred_cls = pred[..., 5:]
@@ -108,6 +110,7 @@ class YOLOLoss(nn.Module):
 
         obj_mask = torch.zeros(self.bs, self.nA, self.gs, self.gs, requires_grad=False).cuda()
         for idx in range(self.bs):
+            print(self.gs)
             for y_true_one in y_true[idx]:
                 print(y_true_one)
                 y_true_one = y_true_one.cuda()
@@ -148,7 +151,7 @@ class YOLOLoss(nn.Module):
         loss['conf'] = MSELoss(self.pred_conf * obj_mask * 5, gt_conf * obj_mask * 5) + \
             MSELoss(self.pred_conf * (1 - obj_mask), self.pred_conf * (1 - obj_mask))
 
-        print(loss)
+        pprint(loss)
 
         return loss
 
@@ -278,7 +281,7 @@ class DarkNet(nn.Module):
                 outputs[i] = outputs[i-1]  # skip
             
             # Print the layer information
-            # print(i, module["type"], x.shape)
+            print(i, module["type"], x.shape)
         
         # return detection result only when evaluated
         if self.training == True:

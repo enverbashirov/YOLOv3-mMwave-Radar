@@ -57,8 +57,8 @@ Some Sources
 ## ChangeLog
 
 16.03.2021 - EB
-- Minor issue/bug on label dimensions to loss function. There is a miss-match.
-- Everything should be tested...
+- Label bounding box is fine now
+- Label class format should be fixed
 - Non-training seems to be working
 - [x] `YOLOLoss()`: Loss function
 - [x] `NMSLayer()`: Non-max suppression

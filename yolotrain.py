@@ -26,14 +26,14 @@ testloader = torch.utils.data.DataLoader(testset, batch_size=8, shuffle=True, nu
 
 # Define the network
 net = DarkNet("cfg/yolov3tiny.cfg", myreso)
-net.train(True)
+net.train(True) # training
+# net.train(False) # detection
 
 # Use GPU if available
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 net.to(device) # Put the network on device
 
 criterion = nn.MSELoss(reduction='mean')
-# criterion = YOLOLoss()
 optimizer = optim.SGD(net.parameters(), lr=0.001, momentum=0.9)
 
 # hyperparameters
