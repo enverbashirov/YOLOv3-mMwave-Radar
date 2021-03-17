@@ -38,13 +38,14 @@ scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=20, gamma=0.1)
 transform = None
 # Train and Test data allocation
 trainset = MmwaveDataset(data_dir = dataPath, transforms = transform)
-trainloader = torch.utils.data.DataLoader(trainset, batch_size=8, shuffle=True, num_workers=2)
+trainloader = torch.utils.data.DataLoader(trainset, batch_size=8, \
+    shuffle=True, num_workers=2, collate_fn = collate)
 testset = MmwaveDataset(data_dir = dataPath, transforms = transform)
-testloader = torch.utils.data.DataLoader(testset, batch_size=8, shuffle=True, num_workers=2)
+testloader = torch.utils.data.DataLoader(testset, batch_size=8, \
+    shuffle=True, num_workers=2, collate_fn = collate)
 
 # TRAIN
 for epoch in range(10):  # loop over the dataset multiple times
-    scheduler.step()
     darknet.train(True) # training
     # darknet.train(False) # detection
 
@@ -57,6 +58,7 @@ for epoch in range(10):  # loop over the dataset multiple times
 
         inputs = inputs.to(device)
         targets = targets.to(device)
+        print(targets)
 
         outputs = darknet(inputs, targets, device)
         outputs['total'].backward()
@@ -81,6 +83,7 @@ for epoch in range(10):  # loop over the dataset multiple times
         # darknet.eval()
         # total = 0
         # correct = 0
+    scheduler.step()
 
 
     # with torch.no_grad():
