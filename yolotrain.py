@@ -13,86 +13,87 @@ from yolo import *
 
 # CONSTANTS
 mycfgdir = "cfg/yolovtiny.cfg"
+dataPath = "save/jp/final"
 myreso = 416
 
-dataPath = "save/jp/final"
-
-# If running on Windows and you get a BrokenPipeError, try setting
-# the num_worker of torch.utils.data.DataLoader() to 0.
-trainset = MmwaveDataset(data_dir = dataPath, transforms = None)
-trainloader = torch.utils.data.DataLoader(trainset, batch_size=8, shuffle=True, num_workers=2)
-testset = MmwaveDataset(data_dir = dataPath, transforms=None)
-testloader = torch.utils.data.DataLoader(testset, batch_size=8, shuffle=True, num_workers=2)
-
-# Define the network
-net = DarkNet("cfg/yolov3tiny.cfg", myreso)
-net.train(True) # training
-# net.train(False) # detection
-
+# NETWORK
+darknet = DarkNet("cfg/yolov3tiny.cfg", myreso)
 # Use GPU if available
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-net.to(device) # Put the network on device
+darknet.to(device) # Put the network on device
 
-criterion = nn.MSELoss(reduction='mean')
-optimizer = optim.SGD(net.parameters(), lr=0.001, momentum=0.9)
+# OPTIMIZER & HYPERPARAMETERS
+optimizer = optim.SGD(filter(lambda p: p.requires_grad, darknet.parameters()), lr=0.001, 
+    momentum=0.9, weight_decay=5e-4, nesterov=True)
+scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=20, gamma=0.1)
 
-# hyperparameters
-scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, milestones=[150, 200], gamma=0.1)
+# DATA PREPARATION
+# transform = transforms.Compose([
+#     # transforms.RandomResizedCrop(size=myreso, interpolation=3),
+#     transforms.Resize(size=(myreso, myreso), interpolation=3),
+#     transforms.ColorJitter(brightness=1.5, saturation=1.5, hue=0.2),
+#     transforms.RandomVerticalFlip(),
+#     transforms.ToTensor()
+# ])
+transform = None
+# Train and Test data allocation
+trainset = MmwaveDataset(data_dir = dataPath, transforms = transform)
+trainloader = torch.utils.data.DataLoader(trainset, batch_size=8, shuffle=True, num_workers=2)
+testset = MmwaveDataset(data_dir = dataPath, transforms = transform)
+testloader = torch.utils.data.DataLoader(testset, batch_size=8, shuffle=True, num_workers=2)
 
 # TRAIN
 for epoch in range(10):  # loop over the dataset multiple times
+    scheduler.step()
+    darknet.train(True) # training
+    # darknet.train(False) # detection
+
     losses = []
-    
+
     start = time.time()
     for batch_idx, (inputs, targets) in enumerate(trainloader):
-        inputs = inputs.to(device)
-        targets = targets.to(device)
-        # print(inputs.size())
-        # print(targets.size())
-        
-        outputs = net(inputs, targets, device)
-        print(outputs.size())
-        exit()
-
-        # compute gradients for all output params 
-        # (could be modified for only specific params)
-        outputs.requires_grad = True
-
         # clear the grads from prev passes
         optimizer.zero_grad()
 
-        # compute dloss/dx for every requires_grad=True
-        loss = criterion(outputs, targets)
-        loss.backward()
+        inputs = inputs.to(device)
+        targets = targets.to(device)
+
+        outputs = darknet(inputs, targets, device)
+        outputs['total'].backward()
+        losses.append(outputs['total'].item())
+
+        # if type(outputs) is dict:
 
         optimizer.step()
-        losses.append(loss.item())
+
         end = time.time()
+        print(f'x: {outputs["x"].item():.2f} y: {outputs["y"].item():.2f} ' \
+                f'w: {outputs["w"].item():.2f} h: {outputs["h"].item():.2f} ' \
+                f'cls: {outputs["cls"].item():.2f} conf: {outputs["conf"].item():.2f}')
 
         if batch_idx % 100 == 0:
+            # Loss : {np.mean(losses)} \
             print(f'Batch Index : {batch_idx} \
-                Loss : {np.mean(losses)} \
                 Time : {end - start} seconds')
 
             start = time.time()
 
-        net.eval()
-        total = 0
-        correct = 0
+        # darknet.eval()
+        # total = 0
+        # correct = 0
 
-    scheduler.step()
 
-    with torch.no_grad():
-      for batch_idx, (inputs, targets) in enumerate(testloader):
-          inputs, targets = inputs.to(device), targets.to(device)
+    # with torch.no_grad():
+    #   for batch_idx, (inputs, targets) in enumerate(testloader):
+    #       inputs, targets = inputs.to(device), targets.to(device)
 
-          s = net(inputs, device)
-          _, predicted = torch.max(outputs.data, 1)
-          total += targets.size(0)
-          correct += predicted.eq(targets.data).cpu().sum()
+    #       s = darknet(inputs, device)
+    #       _, predicted = torch.max(outputs.data, 1)
+    #       total += targets.size(0)
+    #       correct += predicted.eq(targets.data).cpu().sum()
 
-      print('Epoch : %d Test Acc : %.3f' % (epoch, 100.*correct/total))
-      print('--------------------------------------------------------------')
-    net.train()  
+    #   print('Epoch : %d Test Acc : %.3f' % (epoch, 100.*correct/total))
+    #   print('--------------------------------------------------------------')
+    # darknet.train()  
         
-torch.save(net.state_dict(), 'test/yolommwave_net.pth')
+torch.save(darknet.state_dict(), 'checkpoints/yolommwave_net.pth')

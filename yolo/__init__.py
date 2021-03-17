@@ -3,6 +3,7 @@ import torch.nn as nn
 import torch.utils.data
 import torch.optim as optim
 import torchvision
+from torchvision import transforms
 
 import os, pickle, random, time
 import numpy as np
@@ -41,20 +42,15 @@ class MmwaveDataset(torch.utils.data.Dataset):
         
         labels_str = image_address.split("_") \
             [-1].split('[')[1].split(']')[0].split(',') # get the bb info from the filename
-        bbox = np.array([int(a) for a in labels_str]) # [xc, yc, w, h]
 
-        labels = torch.zeros(1, 5) # to make it array of bbs (for multiple bbs in the future)
-        # for i in range(len(targets)):
-        # labels[0, :4] = np.array([float(a) for a in labels_str]) # convert bb info to int array
-        labels[0, 4] = 1 # class label
+        labels = np.zeros((1, 5)) # to make it array of bbs (for multiple bbs in the future)
 
-        # labels[0, :4] = (bbox[0] + bbox[2] / 2) / img_w
-        # labels[0, :4] = (bbox[1] + bbox[3] / 2) / img_h
-        labels[0, :4] = bbox[0] / img_w
-        labels[0, :4] = bbox[1] / img_h
-        labels[0, :4] = bbox[2] / img_w
-        labels[0, :4] = bbox[3] / img_h
-        labels[0, 4] = 1
+        labels[0, :4] = np.array([int(a) for a in labels_str]) # [xc, yc, w, h]
+        labels[0, 0] /= img_w
+        labels[0, 1] /= img_h
+        labels[0, 2] /= img_w
+        labels[0, 3] /= img_h
+        # labels[0, 4] = 0 # class label (0 = person)
 
         image = image.astype(np.float32)
 
@@ -63,7 +59,8 @@ class MmwaveDataset(torch.utils.data.Dataset):
 
         return image, labels
 
-    #Image preprocessing before feeding to network
+    #Image custom preprocessing if required
     def preProcessImage(self, image):
+
         image = np.array(image.convert('RGB'))
         return image.transpose(2,1,0)

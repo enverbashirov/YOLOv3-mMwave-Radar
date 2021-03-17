@@ -23,6 +23,7 @@ Some Sources
 .
 ├── ...
 ├── cfg                    # DarkNet configuration files
+├── checkpoints            # NEW!!! Training checkpoints
 ├── dataprep               # Data preprocessing files
 ├── raw                    # Raw dataset
 ├── save
@@ -43,18 +44,20 @@ Some Sources
 
 ## TODO
 
+- [ ] Hyperparameters check
 - [ ] Output pipeline
 - [ ] Save the model and get the weights on mmwave data
 - [ ] Detection (a working version)
 - [ ] Apply Non-Max Suppression (on model output)
     - to reduce output params before loss function to a single bb (as given in label)
-- [ ] Use MeanSquareError instead of CrossEntropy
-	- take a look https://pytorch.org/docs/stable/generated/torch.nn.MSELoss.html
 - [ ] Reduce the number of layers (keep if possible single block)
-- [ ] Object Confidence Thresholding
 - [ ] Check if network output bounding box attrbutes are relative to the center of the prediction
 
 ## ChangeLog
+
+17.03.2021 - EB
+- Added new `.\checkpoints` folder for saving network training status
+- Loss is returning 'nan' after 2nd or 3rd iteration
 
 16.03.2021 - EB
 - Label bounding box is fine now

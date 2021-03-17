@@ -19,7 +19,7 @@ def imaging(tracker, cluster, data, labels, full_indices):
     flat_data[full_indices] = full_data
     flat_data = flat_data.reshape(data.shape)
     
-    print(flat_data.shape)
+    # print(flat_data.shape)
     ra = flat_data.max(2)
     rd = flat_data.max(1)
     plt.subplot(121)
