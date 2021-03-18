@@ -55,10 +55,10 @@ class YOLOLayer(nn.Module):
         pred_tw = x[..., 2].cuda()
         pred_th = x[..., 3].cuda()
         pred_conf = torch.sigmoid(x[..., 4]).cuda()
-        if self.training == True:
-            pred_cls = x[..., 5:].cuda()  # softmax in cross entropy
-        else:
-            pred_cls = F.softmax(x[..., 5:], dim=-1).cuda()  # class
+        # if self.training == True:
+        #     pred_cls = x[..., 5:].cuda()  # softmax in cross entropy
+        # else:
+        #     pred_cls = F.softmax(x[..., 5:], dim=-1).cuda()  # class
 
         grid_x = torch.arange(gs).repeat(gs, 1).view(
             [1, 1, gs, gs]).float().cuda()
@@ -72,7 +72,7 @@ class YOLOLayer(nn.Module):
         pred[..., 2] = torch.exp(pred_tw) * anchor_w
         pred[..., 3] = torch.exp(pred_th) * anchor_h
         pred[..., 4] = pred_conf
-        pred[..., 5:] = pred_cls
+        # pred[..., 5:] = pred_cls
 
         if not self.training:
             pred[..., :4] *= stride
@@ -112,7 +112,7 @@ class YOLOLoss(nn.Module):
             for y_true_one in y_true[idx]:
                 y_true_one = y_true_one.cuda()
                 gt_bbox = y_true_one[:4] * self.gs
-                gt_cls_label = int(y_true_one[4])
+                # gt_cls_label = int(y_true_one[4])
 
                 gt_xc, gt_yc, gt_w, gt_h = gt_bbox[0:4]
                 gt_i = gt_xc.long().cuda()
@@ -128,7 +128,7 @@ class YOLOLoss(nn.Module):
                 gt_tx[idx, best_a, gt_j, gt_i] = gt_xc - gt_i.float()
                 gt_ty[idx, best_a, gt_j, gt_i] = gt_yc - gt_j.float()
                 gt_conf[idx, best_a, gt_j, gt_i] = best_iou
-                gt_cls[idx, best_a, gt_j, gt_i] = gt_cls_label
+                # gt_cls[idx, best_a, gt_j, gt_i] = gt_cls_label
 
                 obj_mask[idx, best_a, gt_j, gt_i] = 1
 
@@ -143,8 +143,8 @@ class YOLOLoss(nn.Module):
         loss['h'] = MSELoss(self.pred_th * obj_mask, gt_th * obj_mask)
         # loss['cls'] = BCELoss(pred_cls * obj_mask, cls_mask * obj_mask)
 
-        loss['cls'] = CELoss((self.pred_cls * obj_mask.unsqueeze(-1)).view(-1, self.num_classes),
-                                (gt_cls * obj_mask).view(-1).long())
+        # loss['cls'] = CELoss((self.pred_cls * obj_mask.unsqueeze(-1)).view(-1, self.num_classes),
+        #                         (gt_cls * obj_mask).view(-1).long())
         loss['conf'] = MSELoss(self.pred_conf * obj_mask * 5, gt_conf * obj_mask * 5) + \
             MSELoss(self.pred_conf * (1 - obj_mask), self.pred_conf * (1 - obj_mask))
 

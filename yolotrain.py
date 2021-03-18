@@ -58,7 +58,7 @@ for epoch in range(10):  # loop over the dataset multiple times
 
         inputs = inputs.to(device)
         targets = targets.to(device)
-        print(targets)
+        # print(targets)
 
         outputs = darknet(inputs, targets, device)
         outputs['total'].backward()
@@ -71,7 +71,9 @@ for epoch in range(10):  # loop over the dataset multiple times
         end = time.time()
         print(f'x: {outputs["x"].item():.2f} y: {outputs["y"].item():.2f} ' \
                 f'w: {outputs["w"].item():.2f} h: {outputs["h"].item():.2f} ' \
-                f'cls: {outputs["cls"].item():.2f} conf: {outputs["conf"].item():.2f}')
+                # f'cls: {outputs["cls"].item():.2f} ' \
+                f'conf: {outputs["conf"].item()}')
+        # print(f'x: {outputs["x"].item():.2f} y: {outputs["y"].item():.2f} ')
 
         if batch_idx % 100 == 0:
             # Loss : {np.mean(losses)} \

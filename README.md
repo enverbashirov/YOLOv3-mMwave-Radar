@@ -55,6 +55,9 @@ Some Sources
 
 ## ChangeLog
 
+18.03.2021 - EB
+- Filtering the empty labels at `yolo.MmwaveDataset`
+
 17.03.2021 - EB
 - Added new `.\checkpoints` folder for saving network training status
 - Loss is returning 'nan' after 2nd or 3rd iteration
