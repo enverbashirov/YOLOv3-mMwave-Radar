@@ -3,7 +3,7 @@
 # yolo
 # yolo/*
 yolov3.weights
-cfg/yolov3test.cfg
+cfg/yolov3.cfg
 yolo.py
 
 # User-defined
@@ -14,11 +14,10 @@ test/
 data/
 .vscode/
 
-# raw/
 raw/
 figs/
-# save/
 save/
+checkpoints/*
 
 dog-cycle-car.png
 

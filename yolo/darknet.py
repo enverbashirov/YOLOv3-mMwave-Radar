@@ -105,7 +105,7 @@ class YOLOLoss(nn.Module):
         gt_tw = torch.zeros(self.bs, self.nA, self.gs, self.gs, requires_grad=False).cuda()
         gt_th = torch.zeros(self.bs, self.nA, self.gs, self.gs, requires_grad=False).cuda()
         gt_conf = torch.zeros(self.bs, self.nA, self.gs, self.gs, requires_grad=False).cuda()
-        gt_cls = torch.zeros(self.bs, self.nA, self.gs, self.gs, requires_grad=False).cuda()
+        # gt_cls = torch.zeros(self.bs, self.nA, self.gs, self.gs, requires_grad=False).cuda()
 
         obj_mask = torch.zeros(self.bs, self.nA, self.gs, self.gs, requires_grad=False).cuda()
         for idx in range(self.bs):
@@ -134,7 +134,7 @@ class YOLOLoss(nn.Module):
 
         MSELoss = nn.MSELoss(reduction='sum')
         # BCELoss = nn.BCELoss(reduction='sum')
-        CELoss = nn.CrossEntropyLoss(reduction='sum')
+        # CELoss = nn.CrossEntropyLoss(reduction='sum')
 
         loss = dict()
         loss['x'] = MSELoss(self.pred_tx * obj_mask, gt_tx * obj_mask)
@@ -142,9 +142,9 @@ class YOLOLoss(nn.Module):
         loss['w'] = MSELoss(self.pred_tw * obj_mask, gt_tw * obj_mask)
         loss['h'] = MSELoss(self.pred_th * obj_mask, gt_th * obj_mask)
         # loss['cls'] = BCELoss(pred_cls * obj_mask, cls_mask * obj_mask)
-
         # loss['cls'] = CELoss((self.pred_cls * obj_mask.unsqueeze(-1)).view(-1, self.num_classes),
         #                         (gt_cls * obj_mask).view(-1).long())
+
         loss['conf'] = MSELoss(self.pred_conf * obj_mask * 5, gt_conf * obj_mask * 5) + \
             MSELoss(self.pred_conf * (1 - obj_mask), self.pred_conf * (1 - obj_mask))
 
@@ -260,6 +260,9 @@ class DarkNet(nn.Module):
     
                     map1 = outputs[i + layers[0]]
                     map2 = outputs[i + layers[1]]
+                    # print(i, module["type"], module)
+                    # print(map1.shape, map2.shape)
+                    # print(layers)
                     x = torch.cat((map1, map2), 1)
                 
             elif module["type"] == 'yolo':
@@ -289,7 +292,6 @@ class DarkNet(nn.Module):
 
     def create_modules(self, blocks):
         net_info = blocks[0]   #Captures the information about the input and pre-processing  
-        # print(net_info)
         module_list = nn.ModuleList()
         in_channels = 3
         out_channels_list = []
@@ -369,3 +371,76 @@ class DarkNet(nn.Module):
             out_channels_list.append(out_channels)
             
         return (net_info, module_list)
+
+    def load_weights(self, path, cutoff=None):
+        """Load darknet weights from disk.
+        YOLOv3 is fully convolutional, so only conv layers' weights will be loaded
+        Darknet's weights data are organized as
+          1. (optinoal) bn_biases => bn_weights => bn_mean => bn_var
+          1. (optional) conv_bias
+          2. conv_weights
+
+        Args
+        - path: (str) path to .weights file
+        - cutoff: (optinoal, int)
+        """
+        fp = open(path, 'rb')
+        header = np.fromfile(fp, dtype=np.int32, count=5)
+        weights = np.fromfile(fp, dtype=np.float32)
+        fp.close()
+
+        header = torch.from_numpy(header)
+
+        ptr = 0
+        for i, module in enumerate(self.module_list):
+            block = self.blocks[i]
+
+            if cutoff is not None and i == cutoff:
+                print("Stop before", block['type'], "block (No.%d)" % (i+1))
+                break
+
+            if block['type'] == "convolutional":
+                batch_normalize = int(
+                    block['batch_normalize']) if 'batch_normalize' in block else 0
+                conv = module[0]
+
+                if batch_normalize > 0:
+                    bn = module[1]
+                    num_bn_biases = bn.bias.numel()
+
+                    bn_biases = torch.from_numpy(
+                        weights[ptr:ptr+num_bn_biases])
+                    bn_biases = bn_biases.view_as(bn.bias.data)
+                    bn.bias.data.copy_(bn_biases)
+                    ptr += num_bn_biases
+
+                    bn_weights = torch.from_numpy(
+                        weights[ptr:ptr+num_bn_biases])
+                    bn_weights = bn_weights.view_as(bn.weight.data)
+                    bn.weight.data.copy_(bn_weights)
+                    ptr += num_bn_biases
+
+                    bn_running_mean = torch.from_numpy(
+                        weights[ptr:ptr+num_bn_biases])
+                    bn_running_mean = bn_running_mean.view_as(bn.running_mean)
+                    bn.running_mean.copy_(bn_running_mean)
+                    ptr += num_bn_biases
+
+                    bn_running_var = torch.from_numpy(
+                        weights[ptr:ptr+num_bn_biases])
+                    bn_running_var = bn_running_var.view_as(bn.running_var)
+                    bn.running_var.copy_(bn_running_var)
+                    ptr += num_bn_biases
+
+                else:
+                    num_biases = conv.bias.numel()
+                    conv_biases = torch.from_numpy(weights[ptr:ptr+num_biases])
+                    conv_biases = conv_biases.view_as(conv.bias.data)
+                    conv.bias.data.copy_(conv_biases)
+                    ptr = ptr + num_biases
+
+                num_weights = conv.weight.numel()
+                conv_weights = torch.from_numpy(weights[ptr:ptr+num_weights])
+                conv_weights = conv_weights.view_as(conv.weight.data)
+                conv.weight.data.copy_(conv_weights)
+                ptr = ptr + num_weights

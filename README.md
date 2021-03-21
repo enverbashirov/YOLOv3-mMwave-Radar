@@ -44,19 +44,32 @@ Some Sources
 
 ## TODO
 
-- [ ] Hyperparameters check
 - [ ] Output pipeline
-- [ ] Save the model and get the weights on mmwave data
-- [ ] Detection (a working version)
 - [ ] Apply Non-Max Suppression (on model output)
     - to reduce output params before loss function to a single bb (as given in label)
-- [ ] Reduce the number of layers (keep if possible single block)
-- [ ] Check if network output bounding box attrbutes are relative to the center of the prediction
+- [ ] Detection (a working version)
+
+- [ ] Hyperparameters check
+- [ ] Objectiveness score loss calculation original uses binary cross entropy, we are using mean squared
+- [ ] See if class score can be added
+- [ ] Total loss may be wrong (some of the inputs in the batch are skipped due to empty labels while they may have been included during calculations of total loss (mean of the batch))
+- [ ] Remove empty labelled data completely
 
 ## ChangeLog
 
+21.03.2021 - EB
+- Changed `lr` of `optim.SGD()` to 0.0001
+- [x] Reduce the network
+    - Reduced number of layers from 106 to 52 (best we can do without reducing the `YOLO` layers)
+    - Computation time is reduced by ~1/3
+- [x] Save the model and get weights for detection (
+    - `yolo.util.save_checkpoint()`, `yolo.util.load_checkpoint()` (for training)
+    - `yolo.darknet.load_weights()` (for detections, still to be tested))
+- [x] Check if network output bounding box attributes are relative to the center of the prediction
+
 18.03.2021 - EB
-- Filtering the empty labels at `yolo.MmwaveDataset`
+- Filtering the empty labels with `collate()` at `MmwaveDataset`
+- Removed 'class' score attribute from everywhere
 
 17.03.2021 - EB
 - Added new `.\checkpoints` folder for saving network training status

@@ -53,10 +53,11 @@ class MmwaveDataset(torch.utils.data.Dataset):
         if np.any(labels[0, :4] == 0):
             return image, None
 
-        labels[0, 0] /= img_w
-        labels[0, 1] /= img_h
-        labels[0, 2] /= img_w
-        labels[0, 3] /= img_h
+        # Normalizing labels
+        labels[0, 0] /= img_w #Xcenter
+        labels[0, 1] /= img_h #Ycenter
+        labels[0, 2] /= img_w #Width
+        labels[0, 3] /= img_h #Height
         # print(labels_str, labels)
         # labels[0, 4] = 0 # class label (0 = person)
 

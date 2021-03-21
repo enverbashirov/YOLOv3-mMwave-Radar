@@ -1,4 +1,5 @@
 from __future__ import division
+import os
 
 import torch
 import torch.nn as nn
@@ -15,35 +16,6 @@ def unique(tensor):
     tensor_res = tensor.new(unique_tensor.shape)
     tensor_res.copy_(unique_tensor)
     return tensor_res
-
-def IoU(box1, box2):
-    """ Compute IoU between box1 and box2 """
-
-    if box1.is_cuda == True:
-        box1 = box1.cpu()
-    if box2.is_cuda == True:
-        box2 = box2.cpu()
-
-    #Get the coordinates of bounding boxes
-    b1_x1, b1_y1, b1_x2, b1_y2 = box1[:,0], box1[:,1], box1[:,2], box1[:,3]
-    b2_x1, b2_y1, b2_x2, b2_y2 = box2[:,0], box2[:,1], box2[:,2], box2[:,3]
-    
-    #get the corrdinates of the intersection rectangle
-    inter_rect_x1 =  torch.max(b1_x1, b2_x1)
-    inter_rect_y1 =  torch.max(b1_y1, b2_y1)
-    inter_rect_x2 =  torch.min(b1_x2, b2_x2)
-    inter_rect_y2 =  torch.min(b1_y2, b2_y2)
-    
-    #Intersection area
-    inter_area = torch.clamp(inter_rect_x2 - inter_rect_x1 + 1, min=0) * torch.clamp(inter_rect_y2 - inter_rect_y1 + 1, min=0)
-
-    #Union Area
-    b1_area = (b1_x2 - b1_x1 + 1)*(b1_y2 - b1_y1 + 1)
-    b2_area = (b2_x2 - b2_x1 + 1)*(b2_y2 - b2_y1 + 1)
-    
-    iou = inter_area / (b1_area + b2_area - inter_area)
-    
-    return iou
 
 def predict_transform(prediction, inp_dim, anchors, num_classes, CUDA = True):
 
@@ -260,6 +232,35 @@ def load_classes(namesfile):
     names = fp.read().split("\n")[:-1]
     return names
 
+def IoU(box1, box2):
+    """ Compute IoU between box1 and box2 """
+
+    if box1.is_cuda == True:
+        box1 = box1.cpu()
+    if box2.is_cuda == True:
+        box2 = box2.cpu()
+
+    #Get the coordinates of bounding boxes
+    b1_x1, b1_y1, b1_x2, b1_y2 = box1[:,0], box1[:,1], box1[:,2], box1[:,3]
+    b2_x1, b2_y1, b2_x2, b2_y2 = box2[:,0], box2[:,1], box2[:,2], box2[:,3]
+    
+    #get the corrdinates of the intersection rectangle
+    inter_rect_x1 =  torch.max(b1_x1, b2_x1)
+    inter_rect_y1 =  torch.max(b1_y1, b2_y1)
+    inter_rect_x2 =  torch.min(b1_x2, b2_x2)
+    inter_rect_y2 =  torch.min(b1_y2, b2_y2)
+    
+    #Intersection area
+    inter_area = torch.clamp(inter_rect_x2 - inter_rect_x1 + 1, min=0) * torch.clamp(inter_rect_y2 - inter_rect_y1 + 1, min=0)
+
+    #Union Area
+    b1_area = (b1_x2 - b1_x1 + 1)*(b1_y2 - b1_y1 + 1)
+    b2_area = (b2_x2 - b2_x1 + 1)*(b2_y2 - b2_y1 + 1)
+    
+    iou = inter_area / (b1_area + b2_area - inter_area)
+    
+    return iou
+    
 def xywh2xyxy(bbox):
     bbox_ = bbox.clone()
     if len(bbox_.size()) == 1:
@@ -271,7 +272,56 @@ def xywh2xyxy(bbox):
     bbox_[..., 2] = xc + 2 * half_w
     bbox_[..., 3] = yc + 2 * half_h
     return bbox_
-    
+
+def load_checkpoint(checkpoint_dir, epoch, iteration):
+    """Load checkpoint from path
+
+    Args
+    - checkpoint_dir: (str) absolute path to checkpoint folder
+    - epoch: (int) epoch of checkpoint
+    - iteration: (int) iteration of checkpoint in one epoch
+
+    Returns
+    - start_epoch: (int)
+    - start_iteration: (int)
+    - state_dict: (dict) state of model
+    """
+    path = os.path.join(checkpoint_dir, str(epoch) + '.' + str(iteration) + '.ckpt')
+    if not os.path.isfile(path):
+        raise Exception("Checkpoint in epoch %d doesn't exist" % epoch)
+
+    checkpoint = torch.load(path)
+    start_epoch = checkpoint['epoch']
+    state_dict = checkpoint['state_dict']
+    start_iteration = checkpoint['iteration']
+
+    assert epoch == start_epoch, "epoch != checkpoint's start_epoch"
+    assert iteration == start_iteration, "iteration != checkpoint's start_iteration"
+    return start_epoch, start_iteration, state_dict
+
+def save_checkpoint(checkpoint_dir, epoch, iteration, save_dict):
+    """Save checkpoint to path
+
+    Args
+    - path: (str) absolute path to checkpoint folder
+    - epoch: (int) epoch of checkpoint file
+    - iteration: (int) iteration of checkpoint in one epoch
+    - save_dict: (dict) saving parameters dict
+    """
+    os.makedirs(checkpoint_dir, exist_ok=True)
+    path = os.path.join(checkpoint_dir, str(epoch) + '.' + str(iteration) + '.ckpt')
+    assert epoch == save_dict['epoch'], "[ERROR] epoch != save_dict's start_epoch"
+    assert iteration == save_dict['iteration'], "[ERROR] iteration != save_dict's start_iteration"
+    if os.path.isfile(path):
+        print("[WARNING] Overwrite checkpoint in epoch %d, iteration %d" %
+              (epoch, iteration))
+    try:
+        torch.save(save_dict, path)
+    except Exception:
+        raise Exception("[ERROR] Fail to save checkpoint")
+
+    print("[LOG] Checkpoint %d.%d.ckpt saved" % (epoch, iteration))
+
 def parse_cfg(cfgfile):
     """
     Takes a configuration file
