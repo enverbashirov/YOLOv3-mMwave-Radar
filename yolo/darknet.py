@@ -79,7 +79,7 @@ class YOLOLayer(nn.Module):
             return pred.view(bs, -1, num_attrs)
         else:
             loss = YOLOLoss([bs, nA, gs], scaled_anchors, self.num_classes, pred, [pred_tx, pred_ty, pred_tw, pred_th])
-            loss = loss(x, y_true)
+            loss = loss(x, y_true.float())
             return loss
 
 # YOLOv3 Loss

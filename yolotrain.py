@@ -14,13 +14,15 @@ from yolo import *
 torch.cuda.empty_cache()
 
 # CONSTANTS
-mycfgdir = "cfg/yolovtiny.cfg"
+mycfgdir = "cfg/custom.cfg"
 dataPath = "save/jp/final"
 myreso = 416
 
 # NETWORK
-darknet = DarkNet("cfg/yolov3tiny.cfg", myreso)
-# print(darknet.module_list)
+darknet = DarkNet(mycfgdir, myreso)
+pytorch_total_params = sum(p.numel() for p in darknet.parameters() if p.requires_grad)
+print('# of params: ', pytorch_total_params)
+print(darknet.module_list)
 
 # OPTIMIZER & HYPERPARAMETERS
 optimizer = optim.SGD(filter(lambda p: p.requires_grad, darknet.parameters()), lr=0.0001, 
@@ -68,7 +70,7 @@ print(next(darknet.parameters()).device)
 print(f'[LOG] TRAIN | Training images: {len(trainset)}')
 print(f'[LOG] TRAIN | Test images: {len(testset)}')
 print(f'[LOG] TRAIN | Starting to train from epoch {start_epoch} iteration {start_iteration}')
-for epoch in range(start_epoch, 10):
+for epoch in range(start_epoch, 20):
     darknet.train(True) # training
     losses = []
     start = time.time()
