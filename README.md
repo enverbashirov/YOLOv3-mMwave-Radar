@@ -44,27 +44,34 @@ Some Sources
 
 ## TODO
 
-- [ ] Output pipeline
-- [ ] Apply Non-Max Suppression (on model output)
-    - to reduce output params before loss function to a single bb (as given in label)
-- [ ] Detection (a working version)
-
 - [ ] Hyperparameters check
 - [ ] Objectiveness score loss calculation original uses binary cross entropy, we are using mean squared
-- [ ] See if class score can be added
+- [ ] Add accuracy metric to evaluation
+- [ ] On validation loss, keep history and add graphs
 - [ ] Total loss may be wrong (some of the inputs in the batch are skipped due to empty labels while they may have been included during calculations of total loss (mean of the batch))
+- [ ] Check the torchvision.transforms functionality
 - [ ] Remove empty labelled data completely
 
 ## ChangeLog
+
+24.03.2021 - EB
+- Reintroducing class and class loss
+- `yolo.getDataLoaders()`: dataset allocation for train/val or single set
+    - with `random_seed` parameter we can get the same shuffle everytime (useful for testing)
+- Validation is now carried out right after each epoch
+- [x] Output pipeline
+- [x] Apply Non-Max Suppression
+- [x] Detection (a working version)
+
 
 21.03.2021 - EB
 - Changed `lr` of `optim.SGD()` to 0.0001
 - [x] Reduce the network
     - Reduced number of layers from 106 to 52 (best we can do without reducing the `YOLO` layers)
     - Computation time is reduced by ~1/3
-- [x] Save the model and get weights for detection (
+- [x] Save the model and get weights for detection
     - `yolo.util.save_checkpoint()`, `yolo.util.load_checkpoint()` (for training)
-    - `yolo.darknet.load_weights()` (for detections, still to be tested))
+    - `yolo.darknet.load_weights()` (for detections, still to be tested)
 - [x] Check if network output bounding box attributes are relative to the center of the prediction
 
 18.03.2021 - EB

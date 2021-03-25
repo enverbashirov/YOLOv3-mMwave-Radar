@@ -2,9 +2,10 @@ import torch
 import torch.nn as nn
 import torch.utils.data
 import torch.optim as optim
+from torch.utils.data.dataloader import default_collate
+from torch.utils.data.sampler import SubsetRandomSampler
 import torchvision
 from torchvision import transforms
-from torch.utils.data.dataloader import default_collate
 
 import os, pickle, random, time
 import numpy as np
@@ -36,17 +37,14 @@ class MmwaveDataset(torch.utils.data.Dataset):
         return self.data_size
 
     def __getitem__(self, idx):
-        image_address = self.files[idx]
-        image = Image.open(image_address)
+        image_path = self.files[idx]
+        image = Image.open(image_path)
         img_w, img_h = image.size
         
         image = self.preProcessImage(image)
-        image = image.astype(np.float32)
-        if self.transforms:
-            image = self.transforms(image)
 
         labels = np.zeros((1, 5)) # to make it array of bbs (for multiple bbs in the future)
-        labels_str = image_address.split("_") \
+        labels_str = image_path.split("_") \
             [-1].split('[')[1].split(']')[0].split(',') # get the bb info from the filename
         labels[0, :4] = np.array([int(a) for a in labels_str]) # [xc, yc, w, h]
         
@@ -61,14 +59,46 @@ class MmwaveDataset(torch.utils.data.Dataset):
         # print(labels_str, labels)
         # labels[0, 4] = 0 # class label (0 = person)
 
-        return image, labels
+        return image_path, image, labels
 
     #Image custom preprocessing if required
     def preProcessImage(self, image):
-
-        image = np.array(image.convert('RGB'))
-        return image.transpose(2,1,0)
+        if self.transforms:
+            image = self.transforms(image)
+        image = image.convert('RGB')
+        image = np.array(image)
+        image = image.transpose(2,1,0)
+        return image.astype(np.float32)
 
 def collate(batch):
     batch = list(filter(lambda x:x[1] is not None, batch))
     return default_collate(batch) # Use the default method to splice the filtered batch data
+
+def getDataLoaders(data_dir, transforms, train_split=0, batch_size=8, \
+    shuffle=True, num_workers=2, collate_fn=collate, random_seed=0):
+    
+    if train_split < 0 or train_split > 1:
+        raise Exception(f"data_loader | Split ({train_split}) coefficient should be 0 < x < 1")
+
+    dataset = MmwaveDataset(data_dir=data_dir, transforms=transforms)
+    
+    # Single Set
+    if train_split == 0 or train_split == 1:
+        return torch.utils.data.DataLoader(dataset, batch_size=batch_size,
+            shuffle=True, num_workers=num_workers, collate_fn = collate_fn)
+
+    # Generate a fixed seed
+    generator = torch.Generator()
+    if random_seed == 0:
+        generator.manual_seed(random_seed)
+
+    train_size = int(train_split * len(dataset))
+    test_size = len(dataset) - train_size
+    
+    trainset, testset = torch.utils.data.random_split(dataset, [train_size, test_size], generator=generator)
+
+    # Train and Validation sets
+    return torch.utils.data.DataLoader(trainset, batch_size=batch_size, \
+        shuffle=shuffle, num_workers=2, collate_fn = collate_fn),   \
+            torch.utils.data.DataLoader(testset, batch_size=batch_size, \
+        shuffle=shuffle, num_workers=2, collate_fn = collate_fn)

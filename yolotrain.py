@@ -14,15 +14,20 @@ from yolo import *
 torch.cuda.empty_cache()
 
 # CONSTANTS
-mycfgdir = "cfg/custom.cfg"
+mycfgdir = "cfg/yolov3test.cfg"
 dataPath = "save/jp/final"
 myreso = 416
+batch_size = 8
+train_split = 0.8
+shuffle = True
+num_workers = 2
+random_seed = 42
 
 # NETWORK
 darknet = DarkNet(mycfgdir, myreso)
 pytorch_total_params = sum(p.numel() for p in darknet.parameters() if p.requires_grad)
 print('# of params: ', pytorch_total_params)
-print(darknet.module_list)
+# print(darknet.module_list)
 
 # OPTIMIZER & HYPERPARAMETERS
 optimizer = optim.SGD(filter(lambda p: p.requires_grad, darknet.parameters()), lr=0.0001, 
@@ -40,13 +45,9 @@ scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=10, gamma=0.1)
 transform = None
 # ====================================================
 
-# Train and Test data allocation
-trainset = MmwaveDataset(data_dir = dataPath, transforms = transform)
-trainloader = torch.utils.data.DataLoader(trainset, batch_size=8, \
-    shuffle=True, num_workers=2, collate_fn = collate)
-testset = MmwaveDataset(data_dir = dataPath, transforms = transform)
-testloader = torch.utils.data.DataLoader(testset, batch_size=8, \
-    shuffle=True, num_workers=2, collate_fn = collate)
+# Train and Validation data allocation
+trainloader, validloader = getDataLoaders(dataPath, transform, train_split=train_split, batch_size=batch_size, \
+    shuffle=shuffle, num_workers=num_workers, collate_fn=collate, random_seed=random_seed)
 # ====================================================
 
 start_epoch = 0
@@ -63,25 +64,22 @@ start_iteration = 0
 # Use GPU if available
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 darknet.to(device) # Put the network on device
-print(next(darknet.parameters()).device)
+# print(next(darknet.parameters()).device)
 
 
 # TRAIN
-print(f'[LOG] TRAIN | Training images: {len(trainset)}')
-print(f'[LOG] TRAIN | Test images: {len(testset)}')
+print(f'[LOG] TRAIN | Training set: {len(trainloader.dataset)}')
+print(f'[LOG] TRAIN | Validation set: {len(validloader.dataset)}')
 print(f'[LOG] TRAIN | Starting to train from epoch {start_epoch} iteration {start_iteration}')
-for epoch in range(start_epoch, 20):
-    darknet.train(True) # training
+for epoch in range(start_epoch,2):
+    darknet.train() # set network to training mode
     losses = []
     start = time.time()
 
-    for batch_idx, (inputs, targets) in enumerate(trainloader):
-        # clear the grads from prev passes
-        optimizer.zero_grad()
-
-        inputs = inputs.to(device)      # Images
-        targets = targets.to(device)    # Labels
-        outputs = darknet(inputs, targets, device) # Loss
+    for batch_idx, (_, inputs, targets) in enumerate(trainloader):
+        optimizer.zero_grad()   # clear the grads from prev passes
+        inputs, targets = inputs.to(device), targets.to(device) # Images, Labels
+        outputs = darknet(inputs, targets, device)  # Loss
         # outputs.register_hook(lambda grad: print(grad))
         outputs['total'].backward()     # Gradient calculations
         
@@ -98,25 +96,26 @@ for epoch in range(start_epoch, 20):
         # print(f'x: {outputs["x"].item():.2f} y: {outputs["y"].item():.2f} ')
 
         if (batch_idx % 100) == 0:
-            print(f'[LOG] TRAIN | Batch #{batch_idx} \
-                Loss: {np.mean(losses)} \
+            print(f'[LOG] TRAIN | Batch #{batch_idx}\
+                Loss: {np.mean(losses)}\
                 Time: {end - start}s')
             start = time.time()
 
     scheduler.step()
 
-    # with torch.no_grad():
-    #   for batch_idx, (inputs, targets) in enumerate(testloader):
-    #       inputs, targets = inputs.to(device), targets.to(device)
+    # VALIDATION
+    with torch.no_grad():
+        vlosses = []
+        for batch_idx, (_, inputs, targets) in enumerate(validloader):
+            inputs, targets = inputs.to(device), targets.to(device)
 
-    #       s = darknet(inputs, device)
-    #       _, predicted = torch.max(outputs.data, 1)
-    #       total += targets.size(0)
-    #       correct += predicted.eq(targets.data).cpu().sum()
+            voutputs = darknet(inputs, targets)
+            vlosses.append(voutputs['total'].item())
 
-    #   print('Epoch : %d Test Acc : %.3f' % (epoch, 100.*correct/total))
-    #   print('--------------------------------------------------------------')
-    # darknet.train()  
+        # Validation loss!
+        print(f'[LOG] VALID | Epoch #{epoch}    \
+            Loss: {np.mean(vlosses)}')
+    # ====================================================
 
     # save_checkpoint('checkpoints/', epoch + 1, 0, {
     #     'epoch': epoch + 1,
@@ -124,4 +123,8 @@ for epoch in range(start_epoch, 20):
     #     'state_dict': darknet.state_dict()
     # })
 
-# torch.save(darknet.state_dict(), f'checkpoints/yolommwave.ckpt')
+save_checkpoint('checkpoints/', epoch + 1, 0, {
+    'epoch': epoch + 1,
+    'iteration': 0,
+    'state_dict': darknet.state_dict()
+})
