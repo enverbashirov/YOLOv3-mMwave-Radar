@@ -8,20 +8,22 @@ from matplotlib import pyplot as plt
 from matplotlib import rc
 from sklearn.cluster import DBSCAN
 
-# from dataprep import *
-from dataprep import deg2rad_shift, Cluster, get_box, KalmanTracker, plot, plot4train, adjust_bb
+from .channel_extraction import ChannelExtraction
+from .util import Cluster, Supporter, polar2cartesian, cartesian2polar, \
+    deg2rad_shift, shift_rad2deg, get_box, IOU_score
+from .kalman_tracker import KalmanTracker
 
-if __name__ == '__main__':    
+def truth(args):  
     folder = "final"
     rawpath = f'save/jp/proc'
     savepath = f'save/jp/{folder}'
-    plotpath = "save/jp/final/"
+    # plotpath = "save/jp/final/"
 
     # Create the subsequent save folders
-    # if os.path.isdir(savepath):
-    #     shutil.rmtree(savepath)
-    # if not os.path.isdir(savepath):
-    #     os.makedirs(savepath)
+    if os.path.isdir(savepath):
+        shutil.rmtree(savepath)
+    if not os.path.isdir(savepath):
+        os.makedirs(savepath)
     
     for i, fname in enumerate(os.listdir(rawpath + '/denoised')):
         print(fname)
@@ -42,28 +44,28 @@ if __name__ == '__main__':
         MIN_SAMPLES = 40
         EPS = 0.04
         thr = 20
-        assoc_score = 'Mahalanobis' # either 'IOU' or 'Mahalanobis'
-        CLASS_CONF_THR = 0.0
+        # assoc_score = 'Mahalanobis' # either 'IOU' or 'Mahalanobis'
+        # CLASS_CONF_THR = 0.0
 
         # init radar parameters
         c0 = 1/np.sqrt(4*np.pi*1e-7*8.85e-12)
         f_start = 76e9
         f_stop = 78e9
-        Tramp_up = 180e-6
-        Tramp_down = 32e-6
+        # Tramp_up = 180e-6
+        # Tramp_down = 32e-6
         Tp = 250e-6
-        T_int = 66.667e-3
-        N = 512
-        N_loop = 256
-        Tx_power = 100
+        # T_int = 66.667e-3
+        # N = 512
+        # N_loop = 256
+        # Tx_power = 100
         kf = 1.1106e13
-        BrdFuSca = 4.8828e-5
+        # BrdFuSca = 4.8828e-5
         fs = 2.8571e6
         fc = (f_start + f_stop)/2
 
         # compute range angle doppler intervals
         NFFT = 2**10
-        nr_chn = 16
+        # nr_chn = 16
         v_range = np.arange(NFFT)/NFFT*fs*c0/(2*kf)
         r_min = 0.5
         r_max = 10
@@ -76,9 +78,9 @@ if __name__ == '__main__':
         vfreq_vel = np.arange(-NFFT_vel/2, NFFT_vel/2)/NFFT_vel*(1/Tp)
         v_vel = vfreq_vel*c0/(2*fc)
 
-        delta_r = vrange_ext[1] - vrange_ext[0]
-        delta_v = v_vel[1] - v_vel[0]
-        delta_a = vang_deg[1] - vang_deg[0]
+        # delta_r = vrange_ext[1] - vrange_ext[0]
+        # delta_v = v_vel[1] - v_vel[0]
+        # delta_a = vang_deg[1] - vang_deg[0]
 
         action = 'save'
         track_id_list = list(range(1000))   # list with possible track id numbers
@@ -181,7 +183,7 @@ if __name__ == '__main__':
                 cost_matrix = np.asarray(cost_matrix)
 
                 # hungarian algorithm for track association
-                matches, undet, unmatch = KalmanTracker.hungarian_assignment(cost_matrix)
+                matches, undet, _ = KalmanTracker.hungarian_assignment(cost_matrix)
 
                 # handle matched tracks
                 if len(matches) > 0:
@@ -224,3 +226,114 @@ if __name__ == '__main__':
                  action, 
                  vrange_ext, 
                  vang_deg)
+
+
+def imaging(tracker, cluster, data, labels, full_indices):
+    flat_data = np.copy(data.ravel())
+    full_data = flat_data[full_indices]
+    full_data[labels != cluster.label] = 0 
+    flat_data[full_indices] = full_data
+    flat_data = flat_data.reshape(data.shape)
+    
+    # print(flat_data.shape)
+    ra = flat_data.max(2)
+    rd = flat_data.max(1)
+    plt.subplot(121)
+    plt.imshow(rd, aspect='auto')
+    plt.subplot(122)
+    plt.imshow(ra, aspect='auto', extent=(np.pi, 0.25065, 0.5, 10))
+
+    plt.scatter(tracker.rtheta[1], tracker.rtheta[0], marker='x', c='r')
+
+    plt.colorbar()
+    plt.show()
+    plt.close()
+
+def plot(path, data_points, ra, noisy_ramap, t_list, action, index, ranges, angles):
+    boxes = np.array([kt.box for kt in t_list])
+
+    angles = deg2rad_shift(angles)
+    
+    # ramap = data_points.mean(2)
+
+    _, ax = plt.subplots(1, 2)
+    ax[0].set_title('Point-cloud representation')
+    ax[1].set_title('RA map image representation')
+    ax[0].scatter(ra[1], ra[0], marker='.')#, c=labels)
+    ax[1].imshow(noisy_ramap, aspect='auto')
+    ax[0].set_xlabel(r'$\theta$ [rad]')
+    ax[0].set_ylabel(r'$R$ [m]')
+    ax[0].set_xlim([0.25065, np.pi])
+    ax[0].set_ylim([0.5, 10])
+    ax[0].grid()
+    for i in range(len(boxes)):
+        # add real valued bb on point cloud plot
+        add_bb(boxes[i], ax[0], t_list[i].id)
+        # add pixel-level bb to ra image
+        int_box = adjust_bb(boxes[i], ranges, angles)
+        add_bb(int_box, ax[1], t_list[i].id)
+
+    if action == 'save':
+        plt.savefig(path + f'fig_{index}', format='png', dpi=300)
+        plt.close()
+    elif action == 'plot':
+        plt.title(f'Frame {index}')
+        plt.show()
+        plt.close()
+
+def plot4train(path, data_points, noisy_ramap, t_list, action, ranges, angles):
+    boxes = np.array([kt.box for kt in t_list])
+
+    angles = deg2rad_shift(angles)
+    
+    fig = plt.figure(figsize=(13,13), dpi=32, frameon=False)
+    ax = fig.add_axes([0, 0, 1, 1])
+    ax.axis('off')
+    ax.imshow(noisy_ramap, aspect='auto')
+
+    bb = np.zeros((4, 1))
+    for i in range(len(boxes)):
+        # # add pixel-level bb to ra image
+        bb = adjust_bb(boxes[i], ranges, angles)
+        # add_bb(bb, ax, t_list[i].id)
+
+    if bb.all() != 0:
+        if action == 'save':
+            w_scale = 416/len(angles)
+            h_scale = 416/len(ranges)
+
+            bb = [bb[1][0] * w_scale,
+                bb[0][0] * h_scale,
+                bb[3][0] * w_scale,
+                bb[2][0] * h_scale]
+            bb = list(map(int, bb))
+
+            plt.savefig(f'{path}_[{bb[0]},{bb[1]},{bb[2]},{bb[3]}].png', format='png', dpi=32)
+        elif action == 'plot':
+            plt.show()
+    plt.close()
+
+def add_bb(bb, ax, note):
+    ax.add_patch(patches.Rectangle((bb[1] - bb[3]/2, bb[0] - bb[2]/2),     # top left corner coordinates
+                        bb[3],       # width
+                        bb[2],       # height
+                        linewidth=1,
+                        edgecolor='r',
+                        facecolor='none'))
+
+def adjust_bb(bb_real, r, a):
+    '''
+    this function is needed to map the bb obtained in real values to the image 
+    pixel coordinates without the bias introduced by non-uniform spacing of angle bins
+    '''
+    bb_ind = np.zeros(bb_real.shape[0])
+    bb_ind[0] = np.argmin(np.abs(r - bb_real[0]))
+    bb_ind[1] = np.argmin(np.abs(a - bb_real[1]))
+    top = np.argmin(np.abs(r - (bb_real[0] - bb_real[2]/2)))
+    bottom = np.argmin(np.abs(r - (bb_real[0] + bb_real[2]/2)))
+    left = np.argmin(np.abs(a - (bb_real[1] + bb_real[3]/2)))
+    right = np.argmin(np.abs(a - (bb_real[1] - bb_real[3]/2)))
+    bb_ind[2] = np.abs(top - bottom)
+    bb_ind[3] = np.abs(left - right)
+    return bb_ind.reshape(-1, 1)
+

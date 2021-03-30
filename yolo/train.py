@@ -5,61 +5,147 @@ import torch.optim as optim
 import torchvision
 import torchvision.transforms as transforms
 
-from .darknet import *
+import numpy as np
+import pickle, os, time, random
+from PIL import Image
 
-# dataset
-transform = transforms.Compose(
-    [transforms.ToTensor(),
-     transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))])
+from .darknet import DarkNet
+from .dataset import *
+from .util import *
 
-dataPath = "figs/processed/"
-# If running on Windows and you get a BrokenPipeError, try setting
-# the num_worker of torch.utils.data.DataLoader() to 0.
-trainset = torchvision.datasets.CIFAR10(root=dataPath, train=True,
-                                        download=False, transform=transform)
-trainloader = torch.utils.data.DataLoader(trainset, batch_size=4,
-                                          shuffle=True, num_workers=2)
+torch.cuda.empty_cache()
 
-testset = torchvision.datasets.CIFAR10(root=dataPath, train=False,
-                                       download=False, transform=transform)
-testloader = torch.utils.data.DataLoader(testset, batch_size=4,
-                                         shuffle=False, num_workers=2)
+def train(args):
+    # CONSTANTS
+    pathcfg = f"cfg/{args.cfg}.cfg"
+    pathin = f"{args.pathin}"
+    # pathout = f"{args.pathout}"
+    shuffle = True if args.seed != 0 else False
+    num_workers = 2
 
-# Define the network
-_, net = DarkNet(mycfgdir, myreso)
+    # NETWORK
+    darknet = DarkNet(pathcfg, args.reso, args.obj, args.nms)
+    pytorch_total_params = sum(p.numel() for p in darknet.parameters() if p.requires_grad)
+    print('# of params: ', pytorch_total_params)
+    if args.v > 0:
+        print(darknet.module_list)
 
-# print(model)
-criterion = nn.CrossEntropyLoss()
-optimizer = optim.SGD(net.parameters(), lr=0.001, momentum=0.9)
+    # OPTIMIZER & HYPERPARAMETERS
+    optimizer = optim.SGD(filter(lambda p: p.requires_grad, darknet.parameters()), \
+        lr=args.lr, momentum=0.9, weight_decay=5e-4, nesterov=True)
+    scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=10, gamma=0.1)
 
-# Use GPU if available
-device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-# print(device)
+    # IMAGE PREPROCESSING!!!
+    transform = transforms.Compose([
+        # transforms.RandomResizedCrop(size=args.reso, interpolation=3),
+        transforms.Resize(size=(args.reso, args.reso), interpolation=3),
+        transforms.ColorJitter(brightness=1.5, saturation=1.5, hue=0.2),
+        transforms.RandomVerticalFlip(),
+        transforms.ToTensor()
+    ])
+    # ====================================================
 
-for epoch in range(2):  # loop over the dataset multiple times
+    # Train and Validation data allocation
+    trainloader, validloader = getDataLoaders(pathin, transform, \
+        train_split=args.datasplit, batch_size=args.bs, \
+        shuffle=shuffle, num_workers=num_workers, \
+        collate_fn=collate, random_seed=args.seed)
+    # ====================================================
 
-    running_loss = 0.0
-    for i, data in enumerate(trainloader, 0): #TODO: INSERT INPUT IMAGE BATCH
-        # get the inputs; data is a list of [inputs, labels]
-        inputs, labels = data
+    # LOAD A CHECKPOINT!!!
+    start_epoch, start_iteration = args.ckpt.split('.')
+    if start_epoch != '-1' and start_epoch != '0':
+        start_epoch, start_iteration, state_dict = load_checkpoint(
+            'save/checkpoints',
+            int(start_epoch),
+            int(start_iteration)
+        )
+        darknet.load_state_dict(state_dict)
+    else:
+        start_epoch, start_iteration = [0, 0]
+    # ====================================================
 
-        # zero the parameter gradients
-        optimizer.zero_grad()
+    # Use GPU if available
+    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+    darknet.to(device) # Put the network on device
+    if args.v > 0:
+        print(next(darknet.parameters()).device)
 
-        # forward + backward + optimize
-        outputs = net(inputs)
-        loss = criterion(outputs, labels)
-        loss.backward()
-        optimizer.step()
+    # TRAIN
+    print(f'[LOG] TRAIN | Training set: {len(trainloader.dataset)}')
+    print(f'[LOG] TRAIN | Validation set: {len(validloader.dataset)}')
+    print(f'[LOG] TRAIN | Starting to train from epoch {start_epoch} iteration {start_iteration}')
+    if start_epoch > args.ep:
+        print(f'[ERR] TRAIN | Total epochs ({args.ep}) is less then current epoch ({start_epoch})')
+        return  
 
-        # print statistics
-        running_loss += loss.item()
-        if i % 2000 == 1999:    # print every 2000 mini-batches
-            print('[%d, %5d] loss: %.3f' %
-                  (epoch + 1, i + 1, running_loss / 2000))
-            running_loss = 0.0
-print('Finished Training')
+    tlosses, vlosses = [], []
+    for epoch in range(start_epoch, args.ep):
+        print(f'[LOG] TRAIN | Starting Epoch #{epoch+1}')
+        darknet.train() # set network to training mode
+        tloss, vloss = [], []
+        start = time.time()
 
-torch.save(net.state_dict(), './yolommwave_net.pth')
+        for batch_idx, (_, inputs, targets) in enumerate(trainloader):
+            optimizer.zero_grad()   # clear the grads from prev passes
+            inputs, targets = inputs.to(device), targets.to(device) # Images, Labels
+            outputs = darknet(inputs, targets, device)  # Loss
+            outputs['total'].backward()     # Gradient calculations
+            
+            tloss.append(outputs['total'].item())
+            optimizer.step()
 
+            end = time.time()
+
+            # print(f'conf: {outputs["conf"].item():.2f}')
+            # Latest iteration!
+            if args.v == 1:
+                print(f'x: {outputs["x"].item():.2f} y: {outputs["y"].item():.2f} ')
+            elif args.v == 2:
+                print(f'x: {outputs["x"].item():.2f} y: {outputs["y"].item():.2f} ' \
+                        f'w: {outputs["w"].item():.2f} h: {outputs["h"].item():.2f} ' \
+                        f'cls: {outputs["cls"].item():.2f} ' \
+                        f'conf: {outputs["conf"].item()}')
+
+            if (batch_idx % 100) == 99:
+                print(f'[LOG] TRAIN | Batch #{batch_idx+1}\
+                    Loss: {np.mean(tloss)}\
+                    Time: {end - start}s')
+                start = time.time()
+
+            # return
+        # Save train loss for the epoch
+        tlosses.append(np.mean(tloss))
+
+        scheduler.step()
+
+        # VALIDATION
+        with torch.no_grad():
+            for batch_idx, (_, inputs, targets) in enumerate(validloader):
+                inputs, targets = inputs.to(device), targets.to(device)
+
+                voutputs = darknet(inputs, targets)
+                vloss.append(voutputs['total'].item())
+
+            # Validation loss!
+            print(f'[LOG] VALID | Epoch #{epoch+1}    \
+                Loss: {np.mean(vloss)}')
+        # Save valid loss for the epoch
+        vlosses.append(np.mean(vloss))
+        # ====================================================
+
+        if (epoch % 10) == 9:
+            save_checkpoint('save/checkpoints/', epoch+1, 0, {
+                'epoch': epoch+1,
+                'iteration': 0,
+                'state_dict': darknet.state_dict()
+            })
+            plot_losses(tlosses, vlosses)
+
+    save_checkpoint('save/checkpoints/', epoch+1, 0, {
+        'epoch': epoch+1,
+        'iteration': 0,
+        'state_dict': darknet.state_dict()
+    })
+    plot_losses(tlosses, vlosses)
 

@@ -27,7 +27,7 @@ class EmptyLayer(nn.Module):
     def __init__(self):
         super(EmptyLayer, self).__init__()
 
-# YOLO / DETECTION LAYER
+# YOLO / PREDICTION LAYER
 class YOLOLayer(nn.Module):
     def __init__(self, anchors, num_classes, reso, ignore_thresh):
         super(YOLOLayer, self).__init__()
@@ -133,23 +133,29 @@ class YOLOLoss(nn.Module):
                 obj_mask[idx, best_a, gt_j, gt_i] = 1
 
         MSELoss = nn.MSELoss(reduction='sum')
-        # BCELoss = nn.BCELoss(reduction='sum')
+        BCELoss = nn.BCELoss(reduction='sum')
         CELoss = nn.CrossEntropyLoss(reduction='sum')
 
         loss = dict()
+        # Xc, Yc, W, H loss calculation
         loss['x'] = MSELoss(self.pred_tx * obj_mask, gt_tx * obj_mask)
         loss['y'] = MSELoss(self.pred_ty * obj_mask, gt_ty * obj_mask)
         loss['w'] = MSELoss(self.pred_tw * obj_mask, gt_tw * obj_mask)
         loss['h'] = MSELoss(self.pred_th * obj_mask, gt_th * obj_mask)
+
+        # CLASS loss calculation
         # loss['cls'] = BCELoss(pred_cls * obj_mask, cls_mask * obj_mask)
         loss['cls'] = CELoss((self.pred_cls * obj_mask.unsqueeze(-1)).view(-1, self.num_classes),
                                 (gt_cls * obj_mask).view(-1).long())
 
-        loss['conf'] = MSELoss(self.pred_conf * obj_mask * 5, gt_conf * obj_mask * 5) + \
-            MSELoss(self.pred_conf * (1 - obj_mask), self.pred_conf * (1 - obj_mask))
+        # OBJECTIVENESS loss calculation
+        # loss['conf'] = MSELoss(self.pred_conf * obj_mask * 5, gt_conf * obj_mask * 5) + \
+        #     MSELoss(self.pred_conf * (1 - obj_mask), gt_conf * (1 - obj_mask))
+        lambda_noobj = 0.5
+        loss['conf'] = BCELoss(self.pred_conf * obj_mask, (gt_conf * obj_mask).detach()) + \
+            lambda_noobj * BCELoss(self.pred_conf * (1 - obj_mask), (gt_conf * (1 - obj_mask)).detach())
 
         # pprint(loss)
-
         return loss
 
 # Non-Max Suppression
@@ -157,9 +163,9 @@ class NMSLayer(nn.Module):
     """
     NMS layer which performs Non-maximum Suppression
     1. Filter background
-    2. Get detection with particular class
+    2. Get prediction with particular class
     3. Sort by confidence
-    4. Suppress non-max detection
+    4. Suppress non-max prediction
     """
 
     def __init__(self, conf_thresh=0.65, nms_thresh=0.55):
@@ -175,10 +181,10 @@ class NMSLayer(nn.Module):
     def forward(self, x):
         """
         Args
-          x: (Tensor) detection feature map, with size [bs, num_bboxes, 5 + nC]
+          x: (Tensor) prediction feature map, with size [bs, num_bboxes, 5 + nC]
 
         Returns
-          predictions: (Tensor) detection result with size [num_bboxes, [image_batch_idx, 4 offsets, p_obj, max_conf, cls_idx]]
+          predictions: (Tensor) prediction result with size [num_bboxes, [image_batch_idx, 4 offsets, p_obj, max_conf, cls_idx]]
         """
         bs, _, _ = x.size()
         predictions = torch.Tensor().cuda()
@@ -195,8 +201,8 @@ class NMSLayer(nn.Module):
                 non_zero_pred = torch.cat(
                     (non_zero_pred[:, :5], max_score, max_idx), 1)
                 classes = torch.unique(non_zero_pred[:, -1])
-            except Exception:  # no object detected
-                print('No object detected')
+            except Exception:  # no object predicted
+                print('No object predicted')
                 continue
 
             for cls in classes:
@@ -221,12 +227,12 @@ class NMSLayer(nn.Module):
 
 # NETWORK
 class DarkNet(nn.Module):
-    def __init__(self, cfgfile, reso):
+    def __init__(self, cfg, reso=416, thr_obj=0.5, thr_nms=0.5):
         super(DarkNet, self).__init__()
-        self.blocks = parse_cfg(cfgfile)
-        self.reso = reso
+        self.blocks = parse_cfg(cfg)
+        self.reso, self.thr_obj, self.thr_nms = reso, thr_obj, thr_nms
         self.net_info, self.module_list = self.create_modules(self.blocks)
-        self.nms = NMSLayer()
+        self.nms = NMSLayer(self.thr_obj, self.thr_nms)
 
     def forward(self, x, y_true=None, CUDA=False):
         modules = self.blocks[1:]
@@ -276,14 +282,13 @@ class DarkNet(nn.Module):
                     x = self.module_list[i][0](x)
                     predictions = x if len(predictions.size()) == 1 else torch.cat(
                         (predictions, x), 1)
-                    print('testings!!!!')
                         
                 outputs[i] = outputs[i-1]  # skip
             
             # Print the layer information
             # print(i, module["type"], x.shape)
         
-        # return detection result only when evaluated
+        # return prediction result only when evaluated
         if self.training == True:
             return loss
         else:
@@ -363,8 +368,8 @@ class DarkNet(nn.Module):
                 num_classes = int(block['classes'])
                 ignore_thresh = float(block['ignore_thresh'])
 
-                detection = YOLOLayer(anchors, num_classes, self.reso, ignore_thresh)
-                module.add_module("Detection_{}".format(index), detection)
+                prediction = YOLOLayer(anchors, num_classes, self.reso, ignore_thresh)
+                module.add_module("prediction_{}".format(index), prediction)
                                 
             module_list.append(module)
             in_channels = out_channels

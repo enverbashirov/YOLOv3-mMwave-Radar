@@ -23,16 +23,17 @@ Some Sources
 .
 ├── ...
 ├── cfg                    # DarkNet configuration files
-├── checkpoints            # NEW!!! Training checkpoints
 ├── dataprep               # Data preprocessing files
 ├── raw                    # Raw dataset
 ├── save
+│   ├── checkpoints        # NEW! Network checkpoints
 │   ├── jp
 │   │   ├── chext          # Images after `channel_extraction`
 │   │   ├── final          # Network-ready images (`dataprep.plot4train()`)
 │   │   ├── proc           # Images after `processing`
 │   │   └── processed      # Images with point cloud and radar view (`dataprep.plot()`)
-│   └── jp2
+│   ├── jp2
+│   └── results            # NEW! Temporary for plots and predictions
 ├── yolo                   # Network runner files
 └── ...
 ```
@@ -45,14 +46,30 @@ Some Sources
 ## TODO
 
 - [ ] Hyperparameters check
-- [ ] Objectiveness score loss calculation original uses binary cross entropy, we are using mean squared
 - [ ] Add accuracy metric to evaluation
-- [ ] On validation loss, keep history and add graphs
-- [ ] Total loss may be wrong (some of the inputs in the batch are skipped due to empty labels while they may have been included during calculations of total loss (mean of the batch))
-- [ ] Check the torchvision.transforms functionality
-- [ ] Remove empty labelled data completely
+- [ ] Small truth bb issue may be existing (on w, h translation (matplotlib to PIL?))
 
 ## ChangeLog
+
+31.03.2021 - EB
+- Added `__main__`
+    - Check `python . --help`
+    - Example train run: `python . train --lr 0.00001 --ep10`
+    - Example predict run: `python . predict --cfg test --pathout test/results --ckpt 3.0 --obj 0.2 --nms 0.5`
+    - Example dataprep run: `python . data`
+- Renamed `custom.cfg` as `yolov3micro.cfg`
+- Removed class score (`cls`) from loss calculation as we have only 1 class
+- Changed objectiveness (`obj`) loss calculation from MSELoss to BCELoss
+    - [x] ~~Objectiveness score loss calculation original uses binary cross entropy, we are using mean squared~~
+- Fixed bb calculation/scale issue
+    - [x] ~~Total loss may be wrong (some inputs were skipping due to empty labels)~~
+- [x] On validation loss, keep history and add graphs
+    - `yolo.util.plot_losses()`
+- Added some random image manipulations/transformations for training input
+    - [x] Check the torchvision.transforms functionality
+- [x] Remove empty labelled data completely
+- Moved and renamed `dataprep.py` to `./dataprep` as `truth.py`
+- Fixed functionality of batch prediction
 
 24.03.2021 - EB
 - Reintroducing class and class loss
@@ -62,7 +79,6 @@ Some Sources
 - [x] Output pipeline
 - [x] Apply Non-Max Suppression
 - [x] Detection (a working version)
-
 
 21.03.2021 - EB
 - Changed `lr` of `optim.SGD()` to 0.0001
@@ -79,7 +95,7 @@ Some Sources
 - Removed 'class' score attribute from everywhere
 
 17.03.2021 - EB
-- Added new `.\checkpoints` folder for saving network training status
+- Added new `./checkpoints` folder for saving network training status
 - Loss is returning 'nan' after 2nd or 3rd iteration
 
 16.03.2021 - EB
