@@ -2,23 +2,25 @@ YOLO-mMwave-Radar
 
 # README
 
-Some Sources
+#### Usage
+
+Help: `python . --help`
+Data preparation: `python . dataprep --help`
+Training: `python . train --pathin <dataset_dir> --ep <no_of_epochs> ...`
+Prediction: `python . predict --pathin <dataset_dir> --ckpt <checkpoint> --obj <coef>`
+
+#### Some Sources
 
 [YOLOv3: An Incremental Improvement (paper)](https://arxiv.org/abs/1804.02767)
-
 [YOLOv3 PyTorch](https://github.com/ecr23xx/yolov3.pytorch/blob/master/src/layers.py)
-
 [YOLOv3 PyTorch (detection)](https://blog.paperspace.com/how-to-implement-a-yolo-object-detector-in-pytorch/)
-
 [PyTorch Network Tranining Tutorial](https://pytorch.org/tutorials/beginner/blitz/cifar10_tutorial.html)
-
 [YOLOv3 Tensorflow](https://github.com/qqwweee/keras-yolo3/blob/master/yolo3/model.py)
-
 [YOLOv3 Tensorflow (alternative)](https://towardsdatascience.com/dive-really-deep-into-yolo-v3-a-beginners-guide-9e3d2666280e)
 
 
 
-- FOLDER STRUCTURE
+#### FOLDER STRUCTURE
 ```
 .
 ├── ...
@@ -38,18 +40,28 @@ Some Sources
 └── ...
 ```
 
+#### Documentation
+
 - Network output params: (`Batch x No of BBs x BB attributes`)
     - `Batch Size`: number of images fed as a batch (e.g 8)
     - `No of BBs`: number of bounding boxes found for each image (e.g 10647 (usually))
     - `BB attributes`: (e.g 6) `bb_dims` (4) + `obj_score` (1) + `class_scores` (e.g 1 (number of objects)) 
 
-## TODO
+## TODO & NOTES
 
+- Gradient exploding is a common issue
+- [ ] Animating results
 - [ ] Hyperparameters check
 - [ ] Add accuracy metric to evaluation
 - [ ] Small truth bb issue may be existing (on w, h translation (matplotlib to PIL?))
 
 ## ChangeLog
+
+05.04.2021 - EB
+- Fixed shuffling in `yolo.dataset`
+- Default learning rate is reduced to 1e-5 from 1e-4
+- `dataprep` is stable
+    - `python . dataprep --help`
 
 31.03.2021 - EB
 - Added `__main__`

@@ -10,7 +10,7 @@ import cv2
 from PIL import Image, ImageFont, ImageDraw
 import matplotlib.pyplot as plt
 
-def draw_prediction(img_path, prediction, target, reso, names, save_path):
+def draw_prediction(img_path, prediction, target, reso, names, save_path, video=False):
     """Draw prediction result
 
     Args
@@ -70,6 +70,27 @@ def draw_prediction(img_path, prediction, target, reso, names, save_path):
     # img.show()
     img.save(save_path)
     img.close()
+
+def animate_predictions(pathin, pathout, savetype='gif'):
+    if savetype == 'gif':
+        gif = []
+        images = (Image.open(f'{pathin}/{f}').copy() for f in sorted(os.listdir(pathin)) if f.endswith('.png'))
+        for image in images:
+            gif.append(image)
+        gif[0].save(f'test/temp_result.gif', save_all=True, \
+            optimize=False, append_images=gif[1:], loop=0, \
+            duration=67)
+    # elif savetype == 'mp4':
+    #     videodims = (100,100)
+    #     fourcc = cv2.VideoWriter_fourcc(*'avc1')    
+    #     video = cv2.VideoWriter("test.mp4",fourcc, 60,videodims)
+    #     img = Image.new('RGB', videodims, color = 'darkred')
+    #     #draw stuff that goes on every frame here
+    #     for i in range(0,60*60):
+    #         imtemp = img.copy()
+    #         # draw frame specific stuff here.
+    #         video.write(cv2.cvtColor(np.array(imtemp), cv2.COLOR_RGB2BGR))
+    #     video.release()
 
 def IoU(box1, box2):
     """ Compute IoU between box1 and box2 """

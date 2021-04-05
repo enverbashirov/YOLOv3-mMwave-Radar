@@ -6,21 +6,55 @@ import torchvision
 import torchvision.transforms as transforms
 
 import numpy as np
-import pickle, os, time, random
+import pickle, os, time, random, sys
 from PIL import Image
+import argparse
 
 from .darknet import DarkNet
 from .dataset import *
 from .util import *
 
-torch.cuda.empty_cache()
+def parse_arg():
+    parser = argparse.ArgumentParser(description='MmWaveYoLo Prediction module', add_help=True)
 
-def predict(args):
+    parser.add_argument('--cfg', type=str, default='yolov3micro',
+        help="Name of the network config (default: yolov3micro)")
+    parser.add_argument('--pathin', type=str, default='testset',
+        help="Path for the input folder (default: testset)")
+    parser.add_argument('--pathout', type=str, default='results',
+        help="Path for the output folder (default: results)")
+    parser.add_argument('--video', type=bool, default=False,
+        help="Create video after prediction (default: False)")
+        
+    parser.add_argument('--datasplit', type=float, default=0, 
+        help="Dataset split percentage (default: 0 (single set))")
+    parser.add_argument('--seed', type=float, default=0, 
+        help="Seed for the random shuffling (default: 0, (no shuffle))")
+    parser.add_argument('--bs', type=int, default=8, 
+        help="Batch size (default: 0 (single batch))")
+    parser.add_argument('--ckpt', type=str, default='10.0',
+        help="Checkpoint name <'epoch'.'iteration'>")
+
+    parser.add_argument('--nms', type=float, default=0.5, 
+        help="NMS threshold (default: 0.5)")
+    parser.add_argument('--obj', type=float, default=0.5, 
+        help="Objectiveness threshold (default: 0.5)")
+    parser.add_argument('--reso', type=int, default=416,
+        help="Input image resolution (default: 416)")
+
+    parser.add_argument('--v', type=int, default=0, 
+        help="Verbose (0 minimal (default), 1 normal, 2 all")
+    
+    return parser.parse_args(sys.argv[2:])
+
+def predict():
+    torch.cuda.empty_cache()
+    
     # CONSTANTS
+    args = parse_arg()
     pathcfg = f"cfg/{args.cfg}.cfg"
-    pathin = f"{args.pathin}"
-    pathout = f"{args.pathout}"
-    shuffle = True if args.seed != 0 else False
+    pathin = f"save/{args.pathin}/final"
+    pathout = f"save/{args.pathout}"
     num_workers = 2
 
     # NETWORK
@@ -35,12 +69,11 @@ def predict(args):
         transforms.Resize(size=(args.reso, args.reso), interpolation=3),
         transforms.ToTensor()
     ])
-    # transform = None
     # ====================================================
 
     # Test data allocation
     _, testloader = getDataLoaders(pathin, transform, train_split=args.datasplit, batch_size=args.bs, \
-        shuffle=shuffle, num_workers=num_workers, collate_fn=collate, random_seed=args.seed)
+        num_workers=num_workers, collate_fn=collate, random_seed=args.seed)
     # ====================================================
 
     start_epoch = 2
@@ -84,5 +117,7 @@ def predict(args):
                 # draw_prediction(path, prediction, darknet.reso, names=[''], save_path=f'{pathout}/{name}.png')
                 draw_prediction(path, prediction, targets[idx], darknet.reso, \
                     names=[''], save_path=f'{pathout}/{idx}.png')
+                if args.video:
+                    results2video()
             return
     # ====================================================

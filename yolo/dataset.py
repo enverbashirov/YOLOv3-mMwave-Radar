@@ -1,28 +1,20 @@
 import torch
-import torch.nn as nn
 import torch.utils.data
-import torch.optim as optim
 from torch.utils.data.dataloader import default_collate
-from torch.utils.data.sampler import SubsetRandomSampler
-import torchvision
 from torchvision import transforms
 
-import os, pickle, random, time
+import os, random
 import numpy as np
 from PIL import Image
-import argparse
 
-# from .darknet import *
-# from .util import *
-
-anchors_wh = np.array([[10, 13], [16, 30], [33, 23], [30, 61], [62, 45],
-                       [59, 119], [116, 90], [156, 198], [373, 326]],
-                      np.float32) / 416
+# anchors_wh = np.array([[10, 13], [16, 30], [33, 23], [30, 61], [62, 45],
+#                        [59, 119], [116, 90], [156, 198], [373, 326]],
+#                       np.float32) / 416
 
 class MmwaveDataset(torch.utils.data.Dataset):
     def __init__(self, data_dir, data_size = 0, transforms = None):
-        files = os.listdir(data_dir)
-        files = [os.path.join(data_dir,x) for x in files]
+        files = sorted(os.listdir(data_dir))
+        self.files = [f"{data_dir}/{x}" for x in files]
         
         if data_size < 0 or data_size > len(files):
             assert("Data size should be between 0 to number of files in the dataset")
@@ -31,7 +23,6 @@ class MmwaveDataset(torch.utils.data.Dataset):
             data_size = len(files)
         
         self.data_size = data_size
-        self.files = random.sample(files, self.data_size)
         self.transforms = transforms
         
     def __len__(self):
@@ -58,7 +49,7 @@ class MmwaveDataset(torch.utils.data.Dataset):
         labels[0, 2] /= img_w #Width
         labels[0, 3] /= img_h #Height
         # labels[0, 4] = 0 # class label (0 = person)
-        # print(labels_str, labels)
+        # print(torch.any(torch.isfinite(image) == False), labels)
 
         return image_path, image, labels
 
@@ -77,17 +68,19 @@ def collate(batch):
     return default_collate(batch) # Use the default method to splice the filtered batch data
 
 def getDataLoaders(data_dir, transforms, train_split=0, batch_size=8, \
-    shuffle=True, num_workers=2, collate_fn=collate, random_seed=0):
+    num_workers=2, collate_fn=collate, random_seed=0):
     
     if train_split < 0 or train_split > 1:
         raise Exception(f"data_loader | Split ({train_split}) coefficient should be 0 < x < 1")
 
     dataset = MmwaveDataset(data_dir=data_dir, transforms=transforms)
+    shuffle = True if random_seed != 0 else False
     
+    print(shuffle, batch_size, random_seed, train_split)
     # Single Set
     if train_split == 0 or train_split == 1:
-        return torch.utils.data.DataLoader(dataset, batch_size=batch_size,
-            shuffle=True, num_workers=num_workers, collate_fn = collate_fn)
+        return None, torch.utils.data.DataLoader(dataset, batch_size=batch_size,
+            shuffle=shuffle, num_workers=num_workers, collate_fn = collate_fn)
 
     # Generate a fixed seed
     generator = torch.Generator()
@@ -104,5 +97,3 @@ def getDataLoaders(data_dir, transforms, train_split=0, batch_size=8, \
         shuffle=shuffle, num_workers=2, collate_fn = collate_fn),   \
             torch.utils.data.DataLoader(testset, batch_size=batch_size, \
         shuffle=shuffle, num_workers=2, collate_fn = collate_fn)
-
-

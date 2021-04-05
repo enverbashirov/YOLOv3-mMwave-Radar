@@ -3,7 +3,7 @@ from .predict import predict
 
 def main(args):
     if args.Action == 'train':
-        train(args)
+        train()
     elif args.Action == 'predict':
-        predict(args)
+        predict()
 

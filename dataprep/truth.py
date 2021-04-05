@@ -8,27 +8,27 @@ from matplotlib import pyplot as plt
 from matplotlib import rc
 from sklearn.cluster import DBSCAN
 
-from .channel_extraction import ChannelExtraction
-from .util import Cluster, Supporter, polar2cartesian, cartesian2polar, \
-    deg2rad_shift, shift_rad2deg, get_box, IOU_score
+# from .channel_extraction import ChannelExtraction
+from .util import Cluster, deg2rad_shift, get_box
 from .kalman_tracker import KalmanTracker
 
-def truth(args):  
-    folder = "final"
-    rawpath = f'save/jp/proc'
-    savepath = f'save/jp/{folder}'
-    # plotpath = "save/jp/final/"
+def truth(args):
+    action = 'save'
+    rawpath = f'save/{args.pathin}/proc'
+    savepath = f'save/{args.pathout}/final' if args.pathout else f'save/{args.pathin}/final'
+    print(f'[LOG] Truth | Starting: {args.pathin}')
 
     # Create the subsequent save folders
-    if os.path.isdir(savepath):
-        shutil.rmtree(savepath)
+    # if os.path.isdir(savepath):
+    #     shutil.rmtree(savepath)
     if not os.path.isdir(savepath):
         os.makedirs(savepath)
     
     for i, fname in enumerate(os.listdir(rawpath + '/denoised')):
-        print(fname)
-        frawname = f'ra_{fname.split(".")[0].split("_")[1]}_{fname.split(".")[0].split("_")[3]}'
-        print(f'{i+1} / {len(os.listdir(rawpath))} {frawname}')
+        frawname = args.saveprefix if args.saveprefix else args.pathin
+        frawname = f'{frawname}_ra_{fname.split("_")[2]}{fname.split("_")[4].split(".")[0]}'
+        logprefix = f'[LOG] Truth | {i+1} / {len(os.listdir(rawpath + "/denoised"))}'
+        print(f'{logprefix} {frawname}', end='\r')
         
         # starting index in the loaded data
         start = 10
@@ -82,13 +82,12 @@ def truth(args):
         # delta_v = v_vel[1] - v_vel[0]
         # delta_a = vang_deg[1] - vang_deg[0]
 
-        action = 'save'
         track_id_list = list(range(1000))   # list with possible track id numbers
         tracking_list = []
 
         # loop over the time-steps
         for timestep in range(rda_data.shape[-1]):
-            print(f'Timestep {timestep + 1}', end='\r')
+            print(f'{logprefix} {frawname} Timestep: {timestep + 1} \t\t\t', end='\r')
             # select RDA map of the current time-step
             data = rda_data[..., timestep]
             data = data[arg_rmin:arg_rmax + 1]
@@ -127,10 +126,10 @@ def truth(args):
                 labels = DBSCAN(eps=EPS, min_samples=MIN_SAMPLES).fit_predict(normrav_pts_lin.T)
                 unique, counts = np.unique(labels, return_counts=True)
                 if not len(unique):
-                    print('DBSCAN found no clusters! Skipping frame.')
+                    print('[WAR] Truth | DBSCAN found no clusters! Skipping frame.')
                     continue
             else:
-                print('No points to cluster! Skipping frame.')
+                print('[WAR] Truth | No points to cluster! Skipping frame.')
                 continue
 
             # loop over the detected clusters 
@@ -200,7 +199,7 @@ def truth(args):
                         current_tracker.misses_number = 0 
                         # imaging(current_tracker, detected_clusters[detec_idx], data, labels, full_indices.ravel())
                 else:
-                    print('No detections-tracks matches found! Skipping frame.')
+                    print('[WAR] Truth | No detections-tracks matches found! Skipping frame.')
                     continue
 
                 # deal with undetected tracks
@@ -219,14 +218,17 @@ def truth(args):
                 # select the valid tracks, i.e., the ones with less than the max. misses and enough hits
                 sel_tracking_list = [t for t in tracking_list if (t.misses_number <= MAX_AGE) and (t.hits >= MIN_DET_NUMBER)]
 
-            plot4train(f'{savepath}/{frawname}_{timestep}', 
+            plot4train(f'{savepath}/{frawname}{timestep}', 
                  data,
                  raw_ra,
                  sel_tracking_list, 
-                 action, 
                  vrange_ext, 
-                 vang_deg)
+                 vang_deg,
+                 args.reso, 
+                 action)
 
+    print(f'[LOG] Truth | Truth data ready: {savepath}')
+            
 
 def imaging(tracker, cluster, data, labels, full_indices):
     flat_data = np.copy(data.ravel())
@@ -281,12 +283,12 @@ def plot(path, data_points, ra, noisy_ramap, t_list, action, index, ranges, angl
         plt.show()
         plt.close()
 
-def plot4train(path, data_points, noisy_ramap, t_list, action, ranges, angles):
+def plot4train(path, data_points, noisy_ramap, t_list, ranges, angles, reso=416, action='save'):
     boxes = np.array([kt.box for kt in t_list])
 
     angles = deg2rad_shift(angles)
     
-    fig = plt.figure(figsize=(13,13), dpi=32, frameon=False)
+    fig = plt.figure(figsize=(1, 1), dpi=reso, frameon=False)
     ax = fig.add_axes([0, 0, 1, 1])
     ax.axis('off')
     ax.imshow(noisy_ramap, aspect='auto')
@@ -299,8 +301,8 @@ def plot4train(path, data_points, noisy_ramap, t_list, action, ranges, angles):
 
     if bb.all() != 0:
         if action == 'save':
-            w_scale = 416/len(angles)
-            h_scale = 416/len(ranges)
+            w_scale = reso/len(angles)
+            h_scale = reso/len(ranges)
 
             bb = [bb[1][0] * w_scale,
                 bb[0][0] * h_scale,
@@ -308,7 +310,7 @@ def plot4train(path, data_points, noisy_ramap, t_list, action, ranges, angles):
                 bb[2][0] * h_scale]
             bb = list(map(int, bb))
 
-            plt.savefig(f'{path}_[{bb[0]},{bb[1]},{bb[2]},{bb[3]}].png', format='png', dpi=32)
+            plt.savefig(f'{path}_[{bb[0]},{bb[1]},{bb[2]},{bb[3]}].png', format='png', dpi=reso)
         elif action == 'plot':
             plt.show()
     plt.close()

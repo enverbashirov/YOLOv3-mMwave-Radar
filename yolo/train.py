@@ -6,25 +6,54 @@ import torchvision
 import torchvision.transforms as transforms
 
 import numpy as np
-import pickle, os, time, random
+import pickle, os, time, random, sys
 from PIL import Image
+import argparse
 
 from .darknet import DarkNet
 from .dataset import *
 from .util import *
 
-torch.cuda.empty_cache()
+def parse_arg():
+    parser = argparse.ArgumentParser(description='mmWaveYoLov3 Training module', add_help=True)
 
-def train(args):
+    parser.add_argument('--cfg', type=str, default='yolov3micro',
+        help="Name of the network config")
+    parser.add_argument('--pathin', type=str, default='trainset',
+        help="Input dataset name")
+
+    parser.add_argument('--datasplit', type=float, default=0.8, 
+        help="Dataset split percentage (def: 0.8 (80 (train):20 (validation))")
+    parser.add_argument('--seed', type=float, default=42, 
+        help="Seed for the random shuffle (default: 42, 0 for no shuffling)")
+    parser.add_argument('--bs', type=int, default=8, 
+        help="Batch size (default: 8, 0 for single batch)")
+    parser.add_argument('--ckpt', type=str, default='-1.-1',
+        help="Checkpoint name as <'epoch'.'iteration'>")
+    parser.add_argument('--ep', type=int, default=5,
+        help="Total epoch number (default: 5)")
+
+    parser.add_argument('--lr', type=float, default=1e-5, 
+        help="Learning rate (default: 1e-5)")
+    parser.add_argument('--reso', type=int, default=416,
+        help="Input image resolution (default: 416)")
+
+    parser.add_argument('--v', type=int, default=0, 
+        help="Verbose (0 minimal (default), 1 normal, 2 all")
+    
+    return parser.parse_args(sys.argv[2:])
+
+def train():
+    torch.cuda.empty_cache()
+
     # CONSTANTS
+    args = parse_arg()
     pathcfg = f"cfg/{args.cfg}.cfg"
-    pathin = f"{args.pathin}"
-    # pathout = f"{args.pathout}"
-    shuffle = True if args.seed != 0 else False
+    pathin = f"save/{args.pathin}/final"
     num_workers = 2
 
     # NETWORK
-    darknet = DarkNet(pathcfg, args.reso, args.obj, args.nms)
+    darknet = DarkNet(pathcfg, args.reso)
     pytorch_total_params = sum(p.numel() for p in darknet.parameters() if p.requires_grad)
     print('# of params: ', pytorch_total_params)
     if args.v > 0:
@@ -48,8 +77,7 @@ def train(args):
     # Train and Validation data allocation
     trainloader, validloader = getDataLoaders(pathin, transform, \
         train_split=args.datasplit, batch_size=args.bs, \
-        shuffle=shuffle, num_workers=num_workers, \
-        collate_fn=collate, random_seed=args.seed)
+        num_workers=num_workers, collate_fn=collate, random_seed=args.seed)
     # ====================================================
 
     # LOAD A CHECKPOINT!!!
@@ -89,6 +117,7 @@ def train(args):
         for batch_idx, (_, inputs, targets) in enumerate(trainloader):
             optimizer.zero_grad()   # clear the grads from prev passes
             inputs, targets = inputs.to(device), targets.to(device) # Images, Labels
+
             outputs = darknet(inputs, targets, device)  # Loss
             outputs['total'].backward()     # Gradient calculations
             
@@ -97,7 +126,6 @@ def train(args):
 
             end = time.time()
 
-            # print(f'conf: {outputs["conf"].item():.2f}')
             # Latest iteration!
             if args.v == 1:
                 print(f'x: {outputs["x"].item():.2f} y: {outputs["y"].item():.2f} ')
@@ -113,7 +141,6 @@ def train(args):
                     Time: {end - start}s')
                 start = time.time()
 
-            # return
         # Save train loss for the epoch
         tlosses.append(np.mean(tloss))
 
@@ -130,6 +157,7 @@ def train(args):
             # Validation loss!
             print(f'[LOG] VALID | Epoch #{epoch+1}    \
                 Loss: {np.mean(vloss)}')
+                
         # Save valid loss for the epoch
         vlosses.append(np.mean(vloss))
         # ====================================================
