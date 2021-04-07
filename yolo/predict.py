@@ -21,9 +21,9 @@ def parse_arg():
         help="Name of the network config (default: yolov3micro)")
     parser.add_argument('--pathin', type=str, default='testset',
         help="Path for the input folder (default: testset)")
-    parser.add_argument('--pathout', type=str, default='results',
+    parser.add_argument('--pathout', type=str,
         help="Path for the output folder (default: results)")
-    parser.add_argument('--video', type=bool, default=False,
+    parser.add_argument('--video', type=str, default='False',
         help="Create video after prediction (default: False)")
         
     parser.add_argument('--datasplit', type=float, default=0, 
@@ -31,7 +31,7 @@ def parse_arg():
     parser.add_argument('--seed', type=float, default=0, 
         help="Seed for the random shuffling (default: 0, (no shuffle))")
     parser.add_argument('--bs', type=int, default=8, 
-        help="Batch size (default: 0 (single batch))")
+        help="Batch size (default: 8)")
     parser.add_argument('--ckpt', type=str, default='10.0',
         help="Checkpoint name <'epoch'.'iteration'>")
 
@@ -54,7 +54,7 @@ def predict():
     args = parse_arg()
     pathcfg = f"cfg/{args.cfg}.cfg"
     pathin = f"save/{args.pathin}/final"
-    pathout = f"save/{args.pathout}"
+    pathout = f"results/{args.pathout}" if args.pathout else f"results/{args.pathin}"
     num_workers = 2
 
     # NETWORK
@@ -95,6 +95,12 @@ def predict():
     if args.v > 0:
         print(next(darknet.parameters()).device)
 
+    # Create the subsequent save folders
+    # if os.path.isdir(pathout):
+    #     shutil.rmtree(pathout)
+    if not os.path.isdir(pathout):
+        os.makedirs(pathout)
+
     # PREDICT
     print(f'[LOG] PREDICT | Test set: {len(testloader.dataset)}')
     darknet.eval() # set network to evaluation mode
@@ -104,20 +110,16 @@ def predict():
             predictions = darknet(inputs)
 
             for idx, path in enumerate(paths):
-                print(path)
-                # name = path.split('/')[-1].split('[')[0]
+                savename = path.split('/')[-1].split('_')[2]
                 
                 try:
                     prediction = predictions[predictions[:, 0] == idx]
-                    # print(idx, predictions.size(), prediction.size())
                 except Exception:
                     prediction = torch.Tensor([])
                     print(f'[ERROR] TEST | No prediction? {prediction}')
                 
-                # draw_prediction(path, prediction, darknet.reso, names=[''], save_path=f'{pathout}/{name}.png')
                 draw_prediction(path, prediction, targets[idx], darknet.reso, \
-                    names=[''], save_path=f'{pathout}/{idx}.png')
-                if args.video:
-                    results2video()
-            return
+                    names=[''], save_path=f'{pathout}/{savename}.png')
+    if args.video:
+        animate_predictions(pathout, pathout, args.video)
     # ====================================================

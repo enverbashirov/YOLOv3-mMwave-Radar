@@ -87,7 +87,7 @@ def truth(args):
 
         # loop over the time-steps
         for timestep in range(rda_data.shape[-1]):
-            print(f'{logprefix} {frawname} Timestep: {timestep + 1} \t\t\t', end='\r')
+            print(f'{logprefix} {frawname} Timestep: {timestep} \t\t\t', end='\r')
             # select RDA map of the current time-step
             data = rda_data[..., timestep]
             data = data[arg_rmin:arg_rmax + 1]
@@ -218,7 +218,7 @@ def truth(args):
                 # select the valid tracks, i.e., the ones with less than the max. misses and enough hits
                 sel_tracking_list = [t for t in tracking_list if (t.misses_number <= MAX_AGE) and (t.hits >= MIN_DET_NUMBER)]
 
-            plot4train(f'{savepath}/{frawname}{timestep}', 
+            plot4train(f'{savepath}/{frawname}{int(4-len(str(timestep)))*"0"}{timestep}', 
                  data,
                  raw_ra,
                  sel_tracking_list, 
@@ -293,26 +293,20 @@ def plot4train(path, data_points, noisy_ramap, t_list, ranges, angles, reso=416,
     ax.axis('off')
     ax.imshow(noisy_ramap, aspect='auto')
 
-    bb = np.zeros((4, 1))
-    for i in range(len(boxes)):
+
+    w_scale = reso/len(angles)
+    h_scale = reso/len(ranges)
+    bbs = []
+    for i in range(0,min(4, len(boxes))):
         # # add pixel-level bb to ra image
-        bb = adjust_bb(boxes[i], ranges, angles)
+        bb = adjust_bb(boxes[i], ranges, angles, w_scale, h_scale)
+        bbs.append(list(map(int, [bb[1][0], bb[0][0], bb[3][0], bb[2][0]])))
         # add_bb(bb, ax, t_list[i].id)
 
-    if bb.all() != 0:
-        if action == 'save':
-            w_scale = reso/len(angles)
-            h_scale = reso/len(ranges)
-
-            bb = [bb[1][0] * w_scale,
-                bb[0][0] * h_scale,
-                bb[3][0] * w_scale,
-                bb[2][0] * h_scale]
-            bb = list(map(int, bb))
-
-            plt.savefig(f'{path}_[{bb[0]},{bb[1]},{bb[2]},{bb[3]}].png', format='png', dpi=reso)
-        elif action == 'plot':
-            plt.show()
+    if bbs and action == 'save':
+        plt.savefig(f'{path}_{bbs}.png'.replace(' ', ''), format='png', dpi=reso)
+    elif action == 'plot':
+        plt.show()
     plt.close()
 
 def add_bb(bb, ax, note):
@@ -323,19 +317,19 @@ def add_bb(bb, ax, note):
                         edgecolor='r',
                         facecolor='none'))
 
-def adjust_bb(bb_real, r, a):
+def adjust_bb(bb_real, r, a, w_scale = 1, h_scale = 1):
     '''
     this function is needed to map the bb obtained in real values to the image 
     pixel coordinates without the bias introduced by non-uniform spacing of angle bins
     '''
     bb_ind = np.zeros(bb_real.shape[0])
-    bb_ind[0] = np.argmin(np.abs(r - bb_real[0]))
-    bb_ind[1] = np.argmin(np.abs(a - bb_real[1]))
+    bb_ind[0] = np.argmin(np.abs(r - bb_real[0])) * h_scale
+    bb_ind[1] = np.argmin(np.abs(a - bb_real[1])) * w_scale
     top = np.argmin(np.abs(r - (bb_real[0] - bb_real[2]/2)))
     bottom = np.argmin(np.abs(r - (bb_real[0] + bb_real[2]/2)))
     left = np.argmin(np.abs(a - (bb_real[1] + bb_real[3]/2)))
     right = np.argmin(np.abs(a - (bb_real[1] - bb_real[3]/2)))
-    bb_ind[2] = np.abs(top - bottom)
-    bb_ind[3] = np.abs(left - right)
+    bb_ind[2] = np.abs(top - bottom) * h_scale
+    bb_ind[3] = np.abs(left - right) * w_scale
     return bb_ind.reshape(-1, 1)
 

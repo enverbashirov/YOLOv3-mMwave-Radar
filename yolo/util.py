@@ -77,7 +77,7 @@ def animate_predictions(pathin, pathout, savetype='gif'):
         images = (Image.open(f'{pathin}/{f}').copy() for f in sorted(os.listdir(pathin)) if f.endswith('.png'))
         for image in images:
             gif.append(image)
-        gif[0].save(f'test/temp_result.gif', save_all=True, \
+        gif[0].save(f'{pathout}/sequence.gif', save_all=True, \
             optimize=False, append_images=gif[1:], loop=0, \
             duration=67)
     # elif savetype == 'mp4':
@@ -125,11 +125,7 @@ def xywh2xyxy(bbox, target=False):
     if target:
         xc, yc = bbox[0], bbox[1]
         half_w, half_h = bbox[2] / 2, bbox[3] / 2
-        bbox[0] = xc - half_w
-        bbox[1] = yc - half_h
-        bbox[2] = xc + 2 * half_w
-        bbox[3] = yc + 2 * half_h
-        return bbox
+        return [xc - half_w, yc - half_h, xc + half_w, yc + half_h]
     
     bbox_ = bbox.clone()
     if len(bbox_.size()) == 1:
@@ -140,6 +136,24 @@ def xywh2xyxy(bbox, target=False):
     bbox_[..., 1] = yc - half_h
     bbox_[..., 2] = xc + 2 * half_w
     bbox_[..., 3] = yc + 2 * half_h
+    return bbox_
+
+def xyxy2xywh(bbox, target=False):
+    if target:
+        w, h = bbox[2] - bbox[0], bbox[3] - bbox[1]
+        xc, yc = bbox[0] + w/2, bbox[1] + h/2
+        return [xc, yc, w, h]
+    
+    bbox_ = bbox.clone()
+    if len(bbox_.size()) == 1:
+        bbox_ = bbox_.unsqueeze(0)
+    w, h = bbox_[..., 2] - bbox_[..., 0], bbox_[..., 3] - bbox_[..., 1]
+    xc, yc = bbox_[..., 0] + w/2, bbox_[..., 1] + h/2
+
+    bbox_[..., 0] = xc
+    bbox_[..., 1] = yc
+    bbox_[..., 2] = w
+    bbox_[..., 3] = h
     return bbox_
 
 def load_checkpoint(checkpoint_dir, epoch, iteration):
@@ -239,6 +253,7 @@ def plot_losses(tlosses, vlosses=None, save=True):
 
     if save:
         plt.savefig(f'save/results/loss_{len(tlosses)}.png', dpi=100)
+        print(f'[LOG] TRAIN | Loss graph save \"save/results/loss_{len(tlosses)}.png\"')
     else:
         plt.show()
     plt.close()

@@ -6,8 +6,11 @@ YOLO-mMwave-Radar
 
 Help: `python . --help`
 Data preparation: `python . dataprep --help`
-Training: `python . train --pathin <dataset_dir> --ep <no_of_epochs> ...`
-Prediction: `python . predict --pathin <dataset_dir> --ckpt <checkpoint> --obj <coef>`
+`python . dataprep --pathin <in_dir> --pathout <out_dir> --chext --proc --truth`
+Training: `python . train --help`
+`python . predict --pathin testset3 --pathout test --ckpt 80.0 --nms 0.001 --obj 0.005 --video gif`
+Prediction: `python . predict --help`
+`python . train --pathin trainset --datasplit 0.9 --ckpt 80.0 --ep 500`
 
 #### Some Sources
 
@@ -27,6 +30,7 @@ Prediction: `python . predict --pathin <dataset_dir> --ckpt <checkpoint> --obj <
 ├── cfg                    # DarkNet configuration files
 ├── dataprep               # Data preprocessing files
 ├── raw                    # Raw dataset
+├── results                # NEW! Temporary for plots and predictions
 ├── save
 │   ├── checkpoints        # NEW! Network checkpoints
 │   ├── jp
@@ -35,7 +39,6 @@ Prediction: `python . predict --pathin <dataset_dir> --ckpt <checkpoint> --obj <
 │   │   ├── proc           # Images after `processing`
 │   │   └── processed      # Images with point cloud and radar view (`dataprep.plot()`)
 │   ├── jp2
-│   └── results            # NEW! Temporary for plots and predictions
 ├── yolo                   # Network runner files
 └── ...
 ```
@@ -50,12 +53,15 @@ Prediction: `python . predict --pathin <dataset_dir> --ckpt <checkpoint> --obj <
 ## TODO & NOTES
 
 - Gradient exploding is a common issue
-- [ ] Animating results
 - [ ] Hyperparameters check
 - [ ] Add accuracy metric to evaluation
-- [ ] Small truth bb issue may be existing (on w, h translation (matplotlib to PIL?))
 
 ## ChangeLog
+
+07.04.2021 - EB
+- Images to gif
+    - [x] Animating results
+- [x] Small truth bb issue may be existing (on w, h translation (matplotlib to PIL?))
 
 05.04.2021 - EB
 - Fixed shuffling in `yolo.dataset`

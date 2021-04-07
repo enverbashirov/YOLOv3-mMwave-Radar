@@ -17,6 +17,7 @@ data/
 raw/
 figs/
 save/
+results/*
 checkpoints/*
 
 dog-cycle-car.png

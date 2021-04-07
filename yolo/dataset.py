@@ -35,21 +35,38 @@ class MmwaveDataset(torch.utils.data.Dataset):
         
         image = self.preProcessImage(image)
 
-        labels = np.zeros((1, 5)) # to make it array of bbs (for multiple bbs in the future)
-        labels_str = image_path.split("_") \
-            [-1].split('[')[1].split(']')[0].split(',') # get the bb info from the filename
-        labels[0, :4] = np.array([int(a) for a in labels_str]) # [xc, yc, w, h]
-        
-        if np.any(labels[0, :4] == 0):
-            return image, None
+        labels = [] # to make it array of bbs (for multiple bbs in the future)
+        labels_str = image_path.split("_")[-1]
 
-        # Normalizing labels
-        labels[0, 0] /= img_w #Xcenter
-        labels[0, 1] /= img_h #Ycenter
-        labels[0, 2] /= img_w #Width
-        labels[0, 3] /= img_h #Height
-        # labels[0, 4] = 0 # class label (0 = person)
-        # print(torch.any(torch.isfinite(image) == False), labels)
+        if "[[" in labels_str:
+            labels_str = labels_str.split('[[')[1].split(']]')[0].split('],[')
+            labels = np.zeros((4, 5))
+            for i, l in enumerate(labels_str):
+                label = np.zeros(5)
+                label[:4] = np.array([int(a) for a in l.split(',')]) # [xc, yc, w, h]
+
+                # Normalizing labels
+                label[0] /= img_w #Xcenter
+                label[1] /= img_h #Ycenter
+                label[2] /= img_w #Width
+                label[3] /= img_h #Height
+
+                labels[i, :] = label
+        else:
+            labels_str = labels_str.split('[')[1].split(']')[0].split(',') # get the bb info from the filename
+            labels = np.zeros((1, 5))
+            labels[0, :4] = np.array([int(a) for a in labels_str]) # [xc, yc, w, h]
+            
+            if np.any(labels[0, :4] == 0):
+                return image, None
+
+            # Normalizing labels
+            labels[0, 0] /= img_w #Xcenter
+            labels[0, 1] /= img_h #Ycenter
+            labels[0, 2] /= img_w #Width
+            labels[0, 3] /= img_h #Height
+            # labels[0, 4] = 0 # class label (0 = person)
+            # print(torch.any(torch.isfinite(image) == False), labels)
 
         return image_path, image, labels
 
@@ -76,7 +93,6 @@ def getDataLoaders(data_dir, transforms, train_split=0, batch_size=8, \
     dataset = MmwaveDataset(data_dir=data_dir, transforms=transforms)
     shuffle = True if random_seed != 0 else False
     
-    print(shuffle, batch_size, random_seed, train_split)
     # Single Set
     if train_split == 0 or train_split == 1:
         return None, torch.utils.data.DataLoader(dataset, batch_size=batch_size,

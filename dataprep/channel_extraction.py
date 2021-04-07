@@ -15,11 +15,12 @@ def chext(args):
         
     for i, fname in enumerate(os.listdir(rawpath)):
         logprefix = f'[LOG] ChExt | {i+1} / {len(os.listdir(rawpath))}'
+        savename = f'{args.saveprefix}_seq_{i}' if args.saveprefix else f'{fname.split("_")[0]}_seq_{fname.split("_")[1].split(".")[0]}'
         print(f'{logprefix} fname', end='\r')
         channel_extraction(
             f'{rawpath}/{fname}',
             savepath,
-            f'{args.saveprefix}_seq_{i}' if args.saveprefix else f'{fname.split("_")[0]}_seq_{fname.split("_")[1].split(".")[0]}',
+            savename,
             action='SAVE',
             logprefix=logprefix)
     print('\n')

@@ -22,6 +22,9 @@ def parse_arg():
     parser.add_argument('--truth', action='store_true',
         help="Perform ground truth (clustering, tracking) bouding box calculations")
 
+    
+    parser.add_argument('--objcount', type=int, default=1,
+        help="Number of objects per image (default: 1)")
     parser.add_argument('--reso', type=int, default=416,
         help="Input image resolution (def: 416)")
 
