@@ -62,18 +62,18 @@ e.g `python . train --pathin trainset --datasplit 0.9 --ckpt 80.0 --ep 500`\
 - Fixed multi bb ground truth
 - Fixed folder structure to final version
 
-07.04.2021 - EB
+07.04.2021 - EB - Version 1.1
 - Images to gif
     - [x] Animating results
 - [x] Small truth bb issue may be existing (on w, h translation (matplotlib to PIL?))
 
-05.04.2021 - EB
+05.04.2021 - EB - Finalized dataprep
 - Fixed shuffling in `yolo.dataset`
 - Default learning rate is reduced to 1e-5 from 1e-4
 - `dataprep` is stable
     - `python . dataprep --help`
 
-31.03.2021 - EB
+31.03.2021 - EB - Version 1.0
 - Added `__main__`
     - Check `python . --help`
     - Example train run: `python . train --lr 0.00001 --ep10`
@@ -93,7 +93,7 @@ e.g `python . train --pathin trainset --datasplit 0.9 --ckpt 80.0 --ep 500`\
 - Moved and renamed `dataprep.py` to `./dataprep` as `truth.py`
 - Fixed functionality of batch prediction
 
-24.03.2021 - EB
+25.03.2021 - EB - First version
 - Reintroducing class and class loss
 - `yolo.getDataLoaders()`: dataset allocation for train/val or single set
     - with `random_seed` parameter we can get the same shuffle everytime (useful for testing)
@@ -102,7 +102,7 @@ e.g `python . train --pathin trainset --datasplit 0.9 --ckpt 80.0 --ep 500`\
 - [x] Apply Non-Max Suppression
 - [x] Detection (a working version)
 
-21.03.2021 - EB
+23.03.2021 - EB - custom network
 - Changed `lr` of `optim.SGD()` to 0.0001
 - [x] Reduce the network
     - Reduced number of layers from 106 to 52 (best we can do without reducing the `YOLO` layers)
@@ -112,22 +112,22 @@ e.g `python . train --pathin trainset --datasplit 0.9 --ckpt 80.0 --ep 500`\
     - `yolo.darknet.load_weights()` (for detections, still to be tested)
 - [x] Check if network output bounding box attributes are relative to the center of the prediction
 
-18.03.2021 - EB
+18.03.2021 - EB - Learning
 - Filtering the empty labels with `collate()` at `MmwaveDataset`
 - Removed 'class' score attribute from everywhere
 
-17.03.2021 - EB
+17.03.2021 - EB - Filtering empty labels
 - Added new `./checkpoints` folder for saving network training status
 - Loss is returning 'nan' after 2nd or 3rd iteration
 
-16.03.2021 - EB
+16.03.2021 - EB - Training
 - Label bounding box is fine now
 - Label class format should be fixed
 - Non-training seems to be working
 - [x] `YOLOLoss()`: Loss function
 - [x] `NMSLayer()`: Non-max suppression
 
-05.03.2021 - EB
+05.03.2021 - EB 
 - Working `torch.autograd` and `loss.backward()`
 
 25.02.2021 - EB
