@@ -49,7 +49,7 @@ def train():
     # CONSTANTS
     args = parse_arg()
     pathcfg = f"cfg/{args.cfg}.cfg"
-    pathin = f"save/{args.pathin}/final"
+    pathin = f"dataset/{args.pathin}/final"
     num_workers = 2
 
     # NETWORK
@@ -83,14 +83,15 @@ def train():
     # LOAD A CHECKPOINT!!!
     start_epoch, start_iteration = args.ckpt.split('.')
     if start_epoch != '-1' and start_epoch != '0':
-        start_epoch, start_iteration, state_dict = load_checkpoint(
-            'save/checkpoints',
+        start_epoch, start_iteration, state_dict, tlosses, vlosses = load_checkpoint(
+            f'save/checkpoints/',
             int(start_epoch),
             int(start_iteration)
         )
         darknet.load_state_dict(state_dict)
     else:
         start_epoch, start_iteration = [0, 0]
+        tlosses, vlosses = [], []
     # ====================================================
 
     # Use GPU if available
@@ -107,7 +108,6 @@ def train():
         print(f'[ERR] TRAIN | Total epochs ({args.ep}) is less then current epoch ({start_epoch})')
         return  
 
-    tlosses, vlosses = [], []
     for epoch in range(start_epoch, args.ep):
         print(f'[LOG] TRAIN | Starting Epoch #{epoch+1}')
         darknet.train() # set network to training mode
@@ -163,17 +163,21 @@ def train():
         # ====================================================
 
         if (epoch % 10) == 9:
-            save_checkpoint('save/checkpoints/', epoch+1, 0, {
+            save_checkpoint(f'save/checkpoints/', epoch+1, 0, {
                 'epoch': epoch+1,
                 'iteration': 0,
-                'state_dict': darknet.state_dict()
+                'state_dict': darknet.state_dict(),
+                'tlosses': tlosses,
+                'vlosses': vlosses
             })
-            plot_losses(tlosses, vlosses)
+            plot_losses(tlosses, vlosses, f'save/losses')
 
-    save_checkpoint('save/checkpoints/', epoch+1, 0, {
+    save_checkpoint(f'save/checkpoints/', epoch+1, 0, {
         'epoch': epoch+1,
         'iteration': 0,
-        'state_dict': darknet.state_dict()
+        'state_dict': darknet.state_dict(),
+        'tlosses': tlosses,
+        'vlosses': vlosses
     })
-    plot_losses(tlosses, vlosses)
+    plot_losses(tlosses, vlosses, f'save/losses')
 

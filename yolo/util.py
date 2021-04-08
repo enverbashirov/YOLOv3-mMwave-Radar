@@ -10,7 +10,7 @@ import cv2
 from PIL import Image, ImageFont, ImageDraw
 import matplotlib.pyplot as plt
 
-def draw_prediction(img_path, prediction, target, reso, names, save_path, video=False):
+def draw_prediction(img_path, prediction, target, reso, names, pathout, savename):
     """Draw prediction result
 
     Args
@@ -68,29 +68,33 @@ def draw_prediction(img_path, prediction, target, reso, names, save_path, video=
         print(f'[ERR] TEST | Could not draw prediction')
 
     # img.show()
-    img.save(save_path)
+    os.makedirs(pathout, exist_ok=True)
+    img.save(f'{pathout}/{savename}')
     img.close()
 
-def animate_predictions(pathin, pathout, savetype='gif'):
+def animate_predictions(path, savetype='gif'):
     if savetype == 'gif':
         gif = []
-        images = (Image.open(f'{pathin}/{f}').copy() for f in sorted(os.listdir(pathin)) if f.endswith('.png'))
+        images = (Image.open(f'{path}/preds/{f}').copy() for f in sorted(os.listdir(f'{path}/preds')) if f.endswith('.png'))
         for image in images:
             gif.append(image)
-        gif[0].save(f'{pathout}/sequence.gif', save_all=True, \
+
+        os.makedirs(path, exist_ok=True)
+        gif[0].save(f'{path}/sequence.gif', save_all=True, \
             optimize=False, append_images=gif[1:], loop=0, \
             duration=67)
-    # elif savetype == 'mp4':
-    #     videodims = (100,100)
-    #     fourcc = cv2.VideoWriter_fourcc(*'avc1')    
-    #     video = cv2.VideoWriter("test.mp4",fourcc, 60,videodims)
-    #     img = Image.new('RGB', videodims, color = 'darkred')
-    #     #draw stuff that goes on every frame here
-    #     for i in range(0,60*60):
-    #         imtemp = img.copy()
-    #         # draw frame specific stuff here.
-    #         video.write(cv2.cvtColor(np.array(imtemp), cv2.COLOR_RGB2BGR))
-    #     video.release()
+    elif savetype == 'avi':
+        images = [img for img in sorted(os.listdir(f'{path}/preds')) if img.endswith(".png")]
+        frame = cv2.imread(f'{path}/preds/{image[0]}')
+        height, width, _ = frame.shape
+
+        video = cv2.VideoWriter(f'{path}/sequence.avi', 0, 15, (width,height))
+
+        for image in images:
+            video.write(cv2.imread(f'{path}/preds/{image}'))
+
+        cv2.destroyAllWindows()
+        video.release()
 
 def IoU(box1, box2):
     """ Compute IoU between box1 and box2 """
@@ -177,10 +181,12 @@ def load_checkpoint(checkpoint_dir, epoch, iteration):
     start_epoch = checkpoint['epoch']
     state_dict = checkpoint['state_dict']
     start_iteration = checkpoint['iteration']
+    tlosses = checkpoint['tlosses']
+    vlosses = checkpoint['vlosses']
 
     assert epoch == start_epoch, "epoch != checkpoint's start_epoch"
     assert iteration == start_iteration, "iteration != checkpoint's start_iteration"
-    return start_epoch, start_iteration, state_dict
+    return start_epoch, start_iteration, state_dict, tlosses, vlosses
 
 def save_checkpoint(checkpoint_dir, epoch, iteration, save_dict):
     """Save checkpoint to path
@@ -237,7 +243,7 @@ def parse_cfg(cfgfile):
     
     return blocks
 
-def plot_losses(tlosses, vlosses=None, save=True):
+def plot_losses(tlosses, vlosses=None, savepath=''):
 
     plt.plot(range(0, len(tlosses)), tlosses)
     if vlosses:
@@ -251,9 +257,10 @@ def plot_losses(tlosses, vlosses=None, save=True):
     plt.xlabel('Epoch')
     plt.ylabel('Loss')
 
-    if save:
-        plt.savefig(f'save/results/loss_{len(tlosses)}.png', dpi=100)
-        print(f'[LOG] TRAIN | Loss graph save \"save/results/loss_{len(tlosses)}.png\"')
+    if savepath != '':
+        os.makedirs(savepath, exist_ok=True)
+        plt.savefig(f'{savepath}/loss_{len(tlosses)}.png', dpi=100)
+        print(f'[LOG] TRAIN | Loss graph save \"{savepath}/loss_{len(tlosses)}.png\"')
     else:
         plt.show()
     plt.close()

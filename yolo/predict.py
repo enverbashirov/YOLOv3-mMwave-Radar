@@ -19,10 +19,10 @@ def parse_arg():
 
     parser.add_argument('--cfg', type=str, default='yolov3micro',
         help="Name of the network config (default: yolov3micro)")
-    parser.add_argument('--pathin', type=str, default='testset',
+    parser.add_argument('--pathin', type=str,
         help="Path for the input folder (default: testset)")
     parser.add_argument('--pathout', type=str,
-        help="Path for the output folder (default: results)")
+        help="Path for the output folder")
     parser.add_argument('--video', type=str, default='False',
         help="Create video after prediction (default: False)")
         
@@ -53,8 +53,8 @@ def predict():
     # CONSTANTS
     args = parse_arg()
     pathcfg = f"cfg/{args.cfg}.cfg"
-    pathin = f"save/{args.pathin}/final"
-    pathout = f"results/{args.pathout}" if args.pathout else f"results/{args.pathin}"
+    pathin = f"dataset/{args.pathin}/final"
+    pathout = f"results/{args.pathout}"
     num_workers = 2
 
     # NETWORK
@@ -81,8 +81,8 @@ def predict():
 
     # LOAD A CHECKPOINT!!!
     start_epoch, start_iteration = args.ckpt.split('.')
-    start_epoch, start_iteration, state_dict = load_checkpoint(
-        'save/checkpoints',
+    start_epoch, start_iteration, state_dict, _, _ = load_checkpoint(
+        f'save/checkpoints/',
         int(start_epoch),
         int(start_iteration)
     )
@@ -119,7 +119,7 @@ def predict():
                     print(f'[ERROR] TEST | No prediction? {prediction}')
                 
                 draw_prediction(path, prediction, targets[idx], darknet.reso, \
-                    names=[''], save_path=f'{pathout}/{savename}.png')
+                    names=[''], pathout=f'{pathout}/preds', savename=f'{savename}.png')
     if args.video:
-        animate_predictions(pathout, pathout, args.video)
+        animate_predictions(pathout, args.video)
     # ====================================================

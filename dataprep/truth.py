@@ -14,8 +14,8 @@ from .kalman_tracker import KalmanTracker
 
 def truth(args):
     action = 'save'
-    rawpath = f'save/{args.pathin}/proc'
-    savepath = f'save/{args.pathout}/final' if args.pathout else f'save/{args.pathin}/final'
+    rawpath = f'dataset/{args.pathin}/proc'
+    savepath = f'dataset/{args.pathout}/final' if args.pathout else f'dataset/{args.pathin}/final'
     print(f'[LOG] Truth | Starting: {args.pathin}')
 
     # Create the subsequent save folders

@@ -4,7 +4,7 @@ import os, shutil
 
 def chext(args):
     rawpath = f'raw/{args.pathin}'
-    savepath = f'save/{args.pathout}/chext' if args.pathout else f'save/{args.pathin}/chext'
+    savepath = f'dataset/{args.pathout}/chext' if args.pathout else f'dataset/{args.pathin}/chext'
     print(f'[LOG] ChExt | Starting: {args.pathin}')
 
     # Create the subsequent save folders

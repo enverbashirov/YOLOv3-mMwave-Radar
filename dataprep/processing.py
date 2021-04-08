@@ -13,8 +13,8 @@ from scipy.signal.windows import nuttall, taylor
 from .util import *
 
 def proc(args):
-    rawpath = f'save/{args.pathin}/chext'
-    savepath = f'save/{args.pathout}/proc' if args.pathout else f'save/{args.pathin}/proc'
+    rawpath = f'dataset/{args.pathin}/chext'
+    savepath = f'dataset/{args.pathout}/proc' if args.pathout else f'dataset/{args.pathin}/proc'
     print(f'[LOG] Proc | Starting: {args.pathin}')
 
     # Create the subsequent save folders

@@ -11,14 +11,12 @@ yolo.py
 test.py
 tempCodeRunnerFile.py
 test/
-data/
 .vscode/
 
-raw/
-figs/
-save/
+raw/*
+dataset/*
+save/*
 results/*
-checkpoints/*
 
 dog-cycle-car.png
 
