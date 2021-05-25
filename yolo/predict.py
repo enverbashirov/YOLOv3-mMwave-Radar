@@ -1,13 +1,15 @@
 import torch
-import torch.nn as nn
-import torch.nn.functional as F
-import torch.optim as optim
-import torchvision
+# import torch.nn as nn
+# import torch.nn.functional as F
+# import torch.optim as optim
+# import torchvision
 import torchvision.transforms as transforms
 
+import os, sys 
+# import pickle, time, random
+
 import numpy as np
-import pickle, os, time, random, sys
-from PIL import Image
+# from PIL import Image
 import argparse
 
 from .darknet import DarkNet
@@ -39,6 +41,8 @@ def parse_arg():
         help="NMS threshold (default: 0.5)")
     parser.add_argument('--obj', type=float, default=0.5, 
         help="Objectiveness threshold (default: 0.5)")
+    parser.add_argument('--iou', type=float, default=0.5, 
+        help="Intersection over Union threshold (default: 0.5)")
     parser.add_argument('--reso', type=int, default=416,
         help="Input image resolution (default: 416)")
 
@@ -104,12 +108,13 @@ def predict():
     # PREDICT
     print(f'[LOG] PREDICT | Test set: {len(testloader.dataset)}')
     darknet.eval() # set network to evaluation mode
-    outcomes = [0,0,0,0]
+    outcomes = np.zeros(4)
+    predList = []
+    countLabels = 0
     with torch.no_grad():
         for bidx, (paths, inputs, targets) in enumerate(testloader):
             inputs = inputs.to(device)
             predictions = darknet(inputs)
-
 
             for idx, path in enumerate(paths):
                 print(f'[LOG] PREDICT | Predicting {(bidx*args.bs)+idx+1}/{len(testloader.dataset)}', end='\r')
@@ -121,11 +126,19 @@ def predict():
                     prediction = torch.Tensor([])
                     print(f'[ERROR] TEST | No prediction? {prediction}')
 
-                meanAP, outcomes = mean_average_precision(prediction, targets[idx], outcomes, reso=darknet.reso)
+                tempL, _= correctness(prediction, targets[idx], reso=darknet.reso, iou_thresh=args.iou)
+                predList.extend(tempL)
+                countLabels += targets[idx].size(0)
 
-                draw_prediction(path, prediction, targets[idx], darknet.reso, \
-                    names=[''], pathout=f'{pathout}/preds', savename=f'{savename}.png')
-                    
+                # draw_prediction(path, prediction, targets[idx], darknet.reso, \
+                    # names=[''], pathout=f'{pathout}/preds', savename=f'{savename}.png')
+
     if args.video:
         animate_predictions(pathout, args.video)
+
+    print(countLabels)
+    predList = precision_recall(predList, countLabels)
+    plot_precision_recall(predList, pathout=f'{pathout}/map', savename='')
+    # plot_precision_recall(predList, pathout=f'{pathout}/map', savename=f'iou{args.iou}.png')
+    
     # ====================================================

@@ -1,10 +1,11 @@
 from __future__ import division
 import torch
 
-import os, random
+import os
+from operator import itemgetter
 import numpy as np
 import cv2
-from PIL import Image, ImageFont, ImageDraw
+from PIL import Image, ImageDraw
 import matplotlib.pyplot as plt
 
 def draw_prediction(img_path, prediction, target, reso, names, pathout, savename):
@@ -125,31 +126,88 @@ def IoU(box1, box2):
     
     return iou
 
-def mean_average_precision(prediction, target, outcomes, reso=416, iou_thresh=0.5):
-    ious = []
-    for p in prediction:
-        best_iou = 0
-        for t in target:
-            iou = IoU(p[1:5], xywh2xyxy(t[0:4]*reso)).numpy()[0]
-            if iou > best_iou: best_iou = iou
-        ious.append(best_iou)
+# TP / FP / FN / TN calculations
+def correctness(prediction, target, reso=416, iou_thresh=0.5):
+    flagP = np.zeros([prediction.size(0), 2])  # Flag for predictions
+    flagP[:,1] -= 1
+    tempCor = np.zeros(4)
+    flagT = np.zeros(target.size(0))-1
+    tempList = []
+    if prediction.size(0) != 0:
+        for i, p in enumerate(prediction):
+            for j, t in enumerate(target):
+                iou = IoU(p[1:5], xywh2xyxy(t[0:4]*reso)).numpy()[0]
+                if iou > flagP[i, 0]: 
+                    flagP[i,:] = [iou, j]
 
-    # True Positive
-    outcomes[0] += sum(map(lambda x : x>=iou_thresh, ious))
-    # False Positive
-    outcomes[1] += sum(map(lambda x : x<iou_thresh, ious))
+        for i in range(flagP.shape[0]):
+            if flagP[i,0] >= iou_thresh and flagT[int(flagP[i,1])] == -1:
+                # True Positive: iou >= thresh
+                tempCor[0] += 1
+                flagT[int(flagP[i,1])] = 1
+                tempList.append([f'{prediction[i, -3]:.2f}', flagP[i, 0], False])
+            else:
+                # False Positive: iou < thresh or duplicates
+                tempCor[1] = 1
+                tempList.append([f'{prediction[i, -3]:.2f}', flagP[i, 0], True])
+        
     # False Negative
-    if len(ious) < target.size()[0]: 
-        outcomes[2] += target.size()[0] - len(ious)
+    if np.count_nonzero(flagP[:, 1] == -1) == prediction.size(0):
+        tempCor[2] += 1
 
-    precision = outcomes[0] / (outcomes[0] + outcomes[1])
-    recall = outcomes[0] / (outcomes[0] + outcomes[2])
+    return tempList, tempCor
+
+# Precision and recall calculations
+def precision_recall(predList, countLabels):
+    predList.sort(key = itemgetter(1), reverse=True)    # Sort by IoU
+    predList.sort(key = itemgetter(2))                  # Sort by TP
+    predList.sort(key = itemgetter(0), reverse=True)    # Sort by objectiveness
+
+    for i, l in enumerate(predList):
+        temp = [0, 0, 0, 0]
+        if l[2] == False: temp[0] = 1   # TP
+        else: temp[1] = 1               # FP
+
+        if i != 0:
+            temp[0] += predList[i-1][3]     # Cumulative TP
+            temp[1] += predList[i-1][4]     # Cumulative FP
+        temp[2] = float(temp[0] / (temp[0] + temp[1]))  # Precision
+        temp[3] = float(temp[0] / countLabels)          # Recall
+        l.extend(temp)
+
+    return predList
+
+# Drawing precision/recall curve
+def plot_precision_recall(predList, pathout, savename=''):
+
+    predArr = np.array(predList, dtype=np.float)
     
-    meanAP = 0
-    print(outcomes)
-    print(ious, '\n')
+    # print(np.round(predArr[:,-2:], 2))
+    fig, _= plt.subplots(2, 1, gridspec_kw={'height_ratios': [3, 1]})
+    plt.subplot(2, 1, 1)
+    plt.plot(predArr[:, -1], predArr[:, -2])
+    plt.plot(np.round(predArr[:,-1], 2), np.round(predArr[:,-2], 2))
+    plt.grid(True)
+    plt.title(f'Precision/Recall graph ({savename})')
+    plt.xlabel('Recall')
+    plt.ylabel('Precision')
 
-    return meanAP, outcomes
+    plt.subplot(2, 1, 2)
+    plt.plot(predArr[:,0])
+    ax = plt.gca()
+    ax.axes.xaxis.set_visible(False)
+    # ax.axes.yaxis.set_visible(False)
+    plt.rcParams['axes.titley'] = 1.0    # y is in axes-relative coordinates.
+    plt.rcParams['axes.titlepad'] = -14  # pad is in points...
+    plt.title(f'Objectiveness score')
+
+    if savename != '':
+        os.makedirs(f'{pathout}/{savename}', exist_ok=True)
+        plt.savefig(f'{pathout}/{savename}', dpi=100)
+        print(f'[LOG] TRAIN | Precision/Recall graph save \"{pathout}/{savename}\"')
+    else:
+        plt.show()
+    plt.close()
 
 def xywh2xyxy(bbox, target=False):
     if target:

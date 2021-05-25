@@ -1,13 +1,15 @@
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
+# import torch.nn.functional as F
 import torch.optim as optim
-import torchvision
+# import torchvision
 import torchvision.transforms as transforms
 
+# import os, pickle, random
+import time, sys
+
 import numpy as np
-import pickle, os, time, random, sys
-from PIL import Image
+# from PIL import Image
 import argparse
 
 from .darknet import DarkNet

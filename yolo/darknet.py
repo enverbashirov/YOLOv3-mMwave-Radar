@@ -1,10 +1,10 @@
 from __future__ import division
 
 import torch, torch.nn as nn, torch.nn.functional as F 
-from torch.autograd import Variable
+# from torch.autograd import Variable
 import numpy as np
-import cv2
-from pprint import pprint
+# import cv2
+# from pprint import pprint
 
 from .util import *
 

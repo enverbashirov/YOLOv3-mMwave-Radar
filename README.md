@@ -49,14 +49,39 @@ e.g `python . train --pathin trainset --datasplit 0.9 --ckpt 80.0 --ep 500`\
     - `No of BBs`: number of bounding boxes found for each image with full network config (e.g 10647 (usually))
     - `BB attributes`: (e.g 6) `bb_dims` (4) + `obj_score` (1) + `class_scores` (e.g 1 (number of objects)) 
 
+
 ## TODO & NOTES
 
-- New data
-- Train on multi data
-- [ ] Hyperparameters check
-- [ ] Add accuracy metric to evaluation
+- Util (`yolo.util`)
+	- mAP (`mean_average_precision()`)
+    - [mAP with NMS](https://towardsdatascience.com/implementation-of-mean-average-precision-map-with-non-maximum-suppression-f9311eb92522) \
+    - [mAP](https://towardsdatascience.com/evaluating-performance-of-an-object-detection-model-137a349c517b) \
+	- mAP over epoch plot (`plot_mAP()`)
+- Hyperparameters check
+    - [RayTune](https://pytorch.org/tutorials/beginner/hyperparameter_tuning_tutorial.html)
+
+#### Changes Required (temporal info)
+
+- Data loader (`yolo.dataset`)
+	- Take sequence of images (instead of single image)
+
+- Model (`yolo.darknet`)
+	- Add GRU layer
+	- Combine GRU output with current timestep features
+	- Add the new loss parameter
+
+- Network (`cfg\yolov3micro.cfg`)
+    - Add/modify GRU layer
+    - Add/modify feedforward layer
+    - Combine layer (GRU output with current timestep features)
+	
 
 ## ChangeLog
+
+25.05.2021 - EB - Version 1.3.1
+- Working on `plot_precision_recall()`
+- Implemented `correctness()` for TP/FP/FN calculations
+- Implemented `precision_recall()` for cumulative TP and FP, precision and recall calculations
 
 08.04.2021 - EB - Version 1.2
 - Images to avi
