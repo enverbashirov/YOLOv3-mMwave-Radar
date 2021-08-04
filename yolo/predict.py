@@ -12,6 +12,8 @@ import numpy as np
 # from PIL import Image
 import argparse
 
+from torchvision.transforms.functional import InterpolationMode
+
 from .darknet import DarkNet
 from .dataset import *
 from .util import *
@@ -30,6 +32,8 @@ def parse_arg():
         
     parser.add_argument('--datasplit', type=float, default=0, 
         help="Dataset split percentage (default: 0 (single set))")
+    parser.add_argument('--seq', type=int, default=1, 
+        help="Number of images per sequence (default: 1)")
     parser.add_argument('--seed', type=float, default=0, 
         help="Seed for the random shuffling (default: 0, (no shuffle))")
     parser.add_argument('--bs', type=int, default=8, 
@@ -70,14 +74,16 @@ def predict():
 
     # IMAGE PREPROCESSING!!!
     transform = transforms.Compose([
-        transforms.Resize(size=(args.reso, args.reso), interpolation=3),
+        transforms.Resize(size=(args.reso, args.reso), interpolation=InterpolationMode.BICUBIC),
         transforms.ToTensor()
     ])
     # ====================================================
 
     # Test data allocation
-    _, testloader = getDataLoaders(pathin, transform, train_split=args.datasplit, batch_size=args.bs, \
-        num_workers=num_workers, collate_fn=collate, random_seed=args.seed)
+
+    _, testloader = getDataLoaders(pathin, transform, train_split=args.datasplit, \
+        batch_size=args.bs, sequence=args.seq, num_workers=num_workers, \
+        collate_fn=collate, random_seed=args.seed)
     # ====================================================
 
     start_epoch = 2
@@ -111,14 +117,20 @@ def predict():
     outcomes = np.zeros(4)
     predList = []
     countLabels = 0
+    predcount = 0
+
     with torch.no_grad():
         for bidx, (paths, inputs, targets) in enumerate(testloader):
+            paths = np.array(paths).T
+            # print(bidx, np.shape(paths), inputs.shape, targets.shape)
+
             inputs = inputs.to(device)
             predictions = darknet(inputs)
 
+
             for idx, path in enumerate(paths):
                 print(f'[LOG] PREDICT | Predicting {(bidx*args.bs)+idx+1}/{len(testloader.dataset)}', end='\r')
-                savename = path.split('/')[-1].split('_')[2]
+                savename = path[-1].split('/')[-1].split('_')[2]
                 
                 try:
                     prediction = predictions[predictions[:, 0] == idx]
@@ -126,19 +138,23 @@ def predict():
                     prediction = torch.Tensor([])
                     print(f'[ERROR] TEST | No prediction? {prediction}')
 
-                tempL, _= correctness(prediction, targets[idx], reso=darknet.reso, iou_thresh=args.iou)
-                predList.extend(tempL)
-                countLabels += targets[idx].size(0)
+                predL, outcome = correctness(prediction, targets[idx,-1,...], reso=darknet.reso, iou_thresh=args.iou)
+                predList.extend(predL)
 
-                # draw_prediction(path, prediction, targets[idx], darknet.reso, \
-                    # names=[''], pathout=f'{pathout}/preds', savename=f'{savename}.png')
+                outcomes += outcome
+                predcount += prediction.shape[0]
+                countLabels += np.count_nonzero(np.count_nonzero(targets[idx,-1,...].numpy(), axis=1))
+
+                draw_prediction(path[-1], prediction, targets[idx,-1,...], darknet.reso, \
+                    names=[''], pathout=f'{pathout}/preds', savename=f'{savename}.png')
 
     if args.video:
         animate_predictions(pathout, args.video)
 
+    print(len(predList))
     print(countLabels)
-    predList = precision_recall(predList, countLabels)
-    plot_precision_recall(predList, pathout=f'{pathout}/map', savename='')
-    # plot_precision_recall(predList, pathout=f'{pathout}/map', savename=f'iou{args.iou}.png')
-    
+    exit()
+    predArr = precision_recall(predList, countLabels)
+    metrics, interArr = evaluation_metrics(predArr, countLabels, outcomes)
+    plot_precision_recall(predArr, np.asarray(interArr), metrics, pathout=f'{pathout}/map', savename=f'precRecallIoU{args.iou}Obj{args.obj}.png')
     # ====================================================

@@ -227,66 +227,80 @@ class NMSLayer(nn.Module):
 
 # NETWORK
 class DarkNet(nn.Module):
-    def __init__(self, cfg, reso=416, thr_obj=0.5, thr_nms=0.5):
+    def __init__(self, cfg, reso=416, thr_obj=0.5, thr_nms=0.5, seq=1):
         super(DarkNet, self).__init__()
         self.blocks = parse_cfg(cfg)
-        self.reso, self.thr_obj, self.thr_nms = reso, thr_obj, thr_nms
+        self.reso, self.thr_obj, self.thr_nms, self.seq = reso, thr_obj, thr_nms, seq
         self.net_info, self.module_list = self.create_modules(self.blocks)
         self.nms = NMSLayer(self.thr_obj, self.thr_nms)
 
-    def forward(self, x, y_true=None, CUDA=False):
+    def forward(self, xRaw, yRaw_true=None, CUDA=False):
         modules = self.blocks[1:]
         predictions = torch.Tensor().cuda() if CUDA else torch.Tensor()
         outputs = dict()   #We cache the outputs for the route layer
-        loss = dict()
+        # losses = dict()
 
-        for i, module in enumerate(modules):
-            if module["type"] == "convolutional" or module["type"] == "upsample":
-                x = self.module_list[i](x)
-                outputs[i] = x
+        for idSeq in range(xRaw.shape[1]):
+            loss = dict()
+            predictions = torch.Tensor().cuda() if CUDA else torch.Tensor()
+            x = xRaw[:, idSeq, ...]
+            if yRaw_true is not None:
+                y_true = yRaw_true[:, idSeq, ...]
+            # print(x.shape)
+            # print(y_true.shape) 
+            for i, module in enumerate(modules):
+                if module["type"] == "convolutional" or module["type"] == "upsample":
+                    x = self.module_list[i](x)
+                    outputs[i] = x
 
-            elif  module["type"] == "shortcut":
-                from_ = int(module["from"])
-                x = outputs[i-1] + outputs[i+from_]
-                outputs[i] = x
+                elif  module["type"] == "shortcut":
+                    from_ = int(module["from"])
+                    x = outputs[i-1] + outputs[i+from_]
+                    outputs[i] = x
 
-            elif module["type"] == "route":
-                layers = module["layers"]
-                layers = [int(a) for a in layers]
-    
-                if (layers[0]) > 0:
-                    layers[0] = layers[0] - i
-    
-                if len(layers) == 1:
-                    x = outputs[i + (layers[0])]
-    
-                else:
-                    if (layers[1]) > 0:
-                        layers[1] = layers[1] - i
-    
-                    map1 = outputs[i + layers[0]]
-                    map2 = outputs[i + layers[1]]
-                    x = torch.cat((map1, map2), 1)
-                outputs[i] = x
-                
-            elif module["type"] == 'yolo':
-                if self.training == True:
-                    loss_part = self.module_list[i][0](x, y_true)
-                    for key, value in loss_part.items():
-                        value = value
-                        loss[key] = loss[key] + \
-                            value if key in loss.keys() else value
-                        loss['total'] = loss['total'] + \
-                            value if 'total' in loss.keys() else value
-                else:
-                    x = self.module_list[i][0](x)
-                    predictions = x if len(predictions.size()) == 1 else torch.cat(
-                        (predictions, x), 1)
-                        
-                outputs[i] = outputs[i-1]  # skip
-            
-            # Print the layer information
+                elif module["type"] == "route":
+                    layers = module["layers"]
+                    layers = [int(a) for a in layers]
+        
+                    if (layers[0]) > 0:
+                        layers[0] = layers[0] - i
+        
+                    if len(layers) == 1:
+                        x = outputs[i + (layers[0])]
+        
+                    else:
+                        if (layers[1]) > 0:
+                            layers[1] = layers[1] - i
+        
+                        map1 = outputs[i + layers[0]]
+                        map2 = outputs[i + layers[1]]
+                        x = torch.cat((map1, map2), 1)
+                    outputs[i] = x
+                    
+                elif module["type"] == 'yolo':
+                    if self.training == True:
+                        loss_part = self.module_list[i][0](x, y_true)
+                        loss = dict()
+                        for key, value in loss_part.items():
+                            if key != 'total':
+                                loss[key] = loss[key] + \
+                                    value if key in loss.keys() else value
+                                loss['total'] = loss['total'] + \
+                                    value if 'total' in loss.keys() else value
+                    else:
+                        x = self.module_list[i][0](x)
+                        predictions = x if len(predictions.size()) == 1 else torch.cat(
+                            (predictions, x), 1)
+                            
+                    outputs[i] = outputs[i-1]  # skip
+
+            if self.training == True:
+                for key, value in loss.items():
+                    loss[key] = value/self.seq
+                # exit()
+                # Print the layer information
             # print(i, module["type"], x.shape)
+            # exit()
         
         # return prediction result only when evaluated
         if self.training == True:

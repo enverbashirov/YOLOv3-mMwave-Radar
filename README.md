@@ -8,9 +8,9 @@ Help: `python . --help`\
 Data preprocessing: `python . dataprep --help`\
 e.g `python . dataprep --pathin <in_dir> --pathout <out_dir> --chext --proc --truth`\
 Training: `python . train --help`\
-e.g `python . predict --pathin testset3 --pathout test --ckpt 80.0 --nms 0.001 --obj 0.005 --video gif`\
-Prediction: `python . predict --help`\
 e.g `python . train --pathin trainset --datasplit 0.9 --ckpt 80.0 --ep 500`\
+Prediction: `python . predict --help`\
+e.g `python . predict --pathin testset3 --pathout test --ckpt 80.0 --nms 0.001 --obj 0.005 --video gif`\
 
 #### Some Sources
 
@@ -53,7 +53,7 @@ e.g `python . train --pathin trainset --datasplit 0.9 --ckpt 80.0 --ep 500`\
 ## TODO & NOTES
 
 - Util (`yolo.util`)
-	- mAP (`mean_average_precision()`)
+	- mAP (`mean_average_precision()`) over range of IoUs
     - [mAP with NMS](https://towardsdatascience.com/implementation-of-mean-average-precision-map-with-non-maximum-suppression-f9311eb92522) \
     - [mAP](https://towardsdatascience.com/evaluating-performance-of-an-object-detection-model-137a349c517b) \
 	- mAP over epoch plot (`plot_mAP()`)
@@ -78,9 +78,17 @@ e.g `python . train --pathin trainset --datasplit 0.9 --ckpt 80.0 --ep 500`\
 
 ## ChangeLog
 
+04.08.2021 - EB - Version 1.3.3
+- Working on RNN implementation
+- Working on image augmentations
+- Implemented sequence training
+
+23.06.2021 - EB - Version 1.3.2
+- Implemented `plot_precision_recall()`
+
 25.05.2021 - EB - Version 1.3.1
 - Working on `plot_precision_recall()`
-- Implemented `correctness()` for TP/FP/FN calculations
+- Implemented `correctness()` for TP/FP/FN/TN calculations
 - Implemented `precision_recall()` for cumulative TP and FP, precision and recall calculations
 
 08.04.2021 - EB - Version 1.2

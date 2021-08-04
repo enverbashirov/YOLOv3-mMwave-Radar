@@ -1,15 +1,18 @@
 import torch
 import torch.nn as nn
-# import torch.nn.functional as F
 import torch.optim as optim
-# import torchvision
 import torchvision.transforms as transforms
+from torchvision.transforms.functional import InterpolationMode
+import imgaug
+# import bbaug
 
-# import os, pickle, random
+# from ray import tune
+# from ray.tune import CLIReporter
+# from ray.tune.schedulers import ASHAScheduler
+import matplotlib.pyplot as plt
+
 import time, sys
-
 import numpy as np
-# from PIL import Image
 import argparse
 
 from .darknet import DarkNet
@@ -26,6 +29,8 @@ def parse_arg():
 
     parser.add_argument('--datasplit', type=float, default=0.8, 
         help="Dataset split percentage (def: 0.8 (80 (train):20 (validation))")
+    parser.add_argument('--seq', type=int, default=1, 
+        help="Number of images per sequence (default: 1)")
     parser.add_argument('--seed', type=float, default=42, 
         help="Seed for the random shuffle (default: 42, 0 for no shuffling)")
     parser.add_argument('--bs', type=int, default=8, 
@@ -55,7 +60,7 @@ def train():
     num_workers = 2
 
     # NETWORK
-    darknet = DarkNet(pathcfg, args.reso)
+    darknet = DarkNet(pathcfg, args.reso, seq=args.seq)
     pytorch_total_params = sum(p.numel() for p in darknet.parameters() if p.requires_grad)
     print('# of params: ', pytorch_total_params)
     if args.v > 0:
@@ -63,12 +68,12 @@ def train():
 
     # LOAD A CHECKPOINT!!!
     start_epoch, start_iteration = [0, 0]
-    tlosses, vlosses = [], []
+    tlosses, vlosses, metrics = [], [], []
     optimizer, scheduler = None, None
     start_epoch, start_iteration = [int(x) for x in args.ckpt.split('.')]
     if start_epoch != 0 and start_epoch != 0:
         start_epoch, start_iteration, state_dict, \
-        tlosses, vlosses, \
+        tlosses, vlosses, metrics, \
         optimizer, scheduler = load_checkpoint(
             f'save/checkpoints/',
             int(start_epoch),
@@ -79,26 +84,35 @@ def train():
 
     # OPTIMIZER & HYPERPARAMETERS
     if optimizer == None:
-        # optimizer = optim.SGD(filter(lambda p: p.requires_grad, darknet.parameters()), \
-        #     lr=args.lr, momentum=0.9, weight_decay=5e-4, nesterov=True)
         optimizer = optim.Adam(filter(lambda p: p.requires_grad, darknet.parameters()), \
             lr=args.lr, betas=[0.9,0.999], eps=1e-8, weight_decay=0, amsgrad=False)
     if scheduler == None:
         scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=10, gamma=0.1)
 
     # IMAGE PREPROCESSING!!!
+    # transform = transforms.Compose([
+    #     # transforms.RandomResizedCrop(size=args.reso, interpolation=3),
+    #     transforms.Resize(size=(args.reso, args.reso), interpolation=3),
+    #     transforms.ColorJitter(brightness=1.5, saturation=1.5, hue=0.2),
+    #     transforms.RandomVerticalFlip(),
+    #     transforms.ToTensor()
+    # ])
     transform = transforms.Compose([
-        # transforms.RandomResizedCrop(size=args.reso, interpolation=3),
-        transforms.Resize(size=(args.reso, args.reso), interpolation=3),
-        transforms.ColorJitter(brightness=1.5, saturation=1.5, hue=0.2),
-        transforms.RandomVerticalFlip(),
-        transforms.ToTensor()
+        # transforms.Resize(size=(args.reso, args.reso), interpolation=InterpolationMode.BICUBIC),
+        transforms.ToTensor(),
     ])
+    # transform = [      
+    #     [('TranslateX_BBox', 0.6, 4), ('Equalize', 0.8, 10)],        
+    #     [('TranslateY_Only_BBoxes', 0.2, 2), ('Cutout', 0.8, 8)],     
+    #     [('Sharpness', 0.0, 8), ('ShearX_BBox', 0.4, 0)],      
+    #     [('ShearY_BBox', 1.0, 2), ('TranslateY_Only_BBoxes', 0.6, 6)], 
+    #     [('Rotate_BBox', 0.6, 10), ('Color', 1.0, 6)],
+    # ]
     # ====================================================
 
     # Train and Validation data allocation
     trainloader, validloader = getDataLoaders(pathin, transform, \
-        train_split=args.datasplit, batch_size=args.bs, \
+        train_split=args.datasplit, batch_size=args.bs, sequence=args.seq, \
         num_workers=num_workers, collate_fn=collate, random_seed=args.seed)
     # ====================================================
 
@@ -121,11 +135,18 @@ def train():
     for epoch in range(start_epoch, args.ep):
         print(f'[LOG] TRAIN | Starting Epoch #{epoch+1}')
         darknet.train() # set network to training mode
-        tloss, vloss = [], []
+        tloss, vloss, metric = [], [], []
         start = time.time()
 
         for batch_idx, (_, inputs, targets) in enumerate(trainloader):
             optimizer.zero_grad()   # clear the grads from prev passes
+
+            print(transforms.ToPILImage(inputs[0,0,...]))
+            # plt.imshow(np.reshape(np.array(inputs[0,0,...]),(416,416,3)))
+            plt.imshow(transforms.ToPILImage(inputs[0,0,...]))
+            plt.show()
+            exit()
+
             inputs, targets = inputs.to(device), targets.to(device) # Images, Labels
 
             outputs = darknet(inputs, targets, device)  # Loss
@@ -165,12 +186,14 @@ def train():
                 vloss.append(voutputs['total'].item())
 
             # Validation loss!
-            print(f'[LOG] VALID | Epoch #{epoch+1}    \
+            print(f'[LOG] VALID | Epoch #{epoch+1} \
                 Loss: {np.mean(vloss)}')
-                
+
         # Save valid loss for the epoch
         vlosses.append(np.mean(vloss))
+        # metrics.append(metric)
         # ====================================================
+        # metric, _= evaluation_metrics(predList, countLabels, outcomes)
 
         if (epoch % 10) == 9:
             save_checkpoint(f'save/checkpoints/', epoch+1, 0, {
@@ -179,6 +202,7 @@ def train():
                 'state_dict': darknet.state_dict(),
                 'tlosses': tlosses,
                 'vlosses': vlosses,
+                'metrics': metrics,
                 'optimizer': optimizer,
                 'scheduler': scheduler
             })
@@ -194,4 +218,5 @@ def train():
         'scheduler': scheduler
     })
     plot_losses(tlosses, vlosses, f'save/losses')
+    # plot_accuracies(metrics, f'save/performance')
 
