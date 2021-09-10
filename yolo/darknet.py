@@ -1,15 +1,12 @@
 from __future__ import division
 
-import torch, torch.nn as nn, torch.nn.functional as F 
-# from torch.autograd import Variable
+import torch, torch.nn as nn, torch.nn.functional as F
 import numpy as np
-# import cv2
-# from pprint import pprint
 
 from .util import *
 
 # =================================================================
-# MAXPOOL (with stride = 1, NOT SURE IF NEEDED)
+# MAXPOOL (NOT USED)
 class MaxPool1s(nn.Module):
 
     def __init__(self, kernel_size):
@@ -26,6 +23,40 @@ class MaxPool1s(nn.Module):
 class EmptyLayer(nn.Module):
     def __init__(self):
         super(EmptyLayer, self).__init__()
+
+# HIDDEN LAYER (FOR RNN)
+class HiddenLayer(nn.Module):
+    def __init__(self, hidden_size):
+        super(HiddenLayer, self).__init__()
+        self.hidden_size = hidden_size
+        self.x = torch.zeros(self.hidden_size).cuda()
+        
+    def forward(self, x=None):
+        if x != None:
+            self.x = x.cuda()
+        return self.x
+
+# COMBINE LAYER (FOR RNN)
+class CombineLayer(nn.Module):
+    def __init__(self):
+        super(CombineLayer, self).__init__()
+
+    def forward(self, x, x_):
+        return torch.cat((x, x_), 1)
+
+class GRULayer(nn.Module):
+    def __init__(self, input_size, hidden_size, bias=True):
+        super(GRULayer, self).__init__()
+        self.hidden_size = hidden_size
+        self.hidden_state = None
+        self.gru = nn.GRU(input_size, hidden_size, bias).cuda()
+
+    def forward(self, x):
+        if self.hidden_state == None:
+            self.hidden_state = self.gru(x)
+        else:
+            self.hidden_state = self.gru(x, self.h)
+        return self.hidden_state
 
 # YOLO / PREDICTION LAYER
 class YOLOLayer(nn.Module):
@@ -115,8 +146,10 @@ class YOLOLoss(nn.Module):
                 gt_cls_label = int(y_true_one[4])
 
                 gt_xc, gt_yc, gt_w, gt_h = gt_bbox[0:4]
-                gt_i = gt_xc.long().cuda()
-                gt_j = gt_yc.long().cuda()
+                gt_i = torch.as_tensor(max(min(gt_xc.item(), 12), 0)).long().cuda()
+                gt_j = torch.as_tensor(max(min(gt_yc.item(), 12), 0)).long().cuda()
+                # gt_i = gt_xc.long().cuda()
+                # gt_j = gt_yc.long().cuda()
 
                 pred_bbox = self.predictions[idx, :, gt_j, gt_i, :4]
                 ious = IoU(xywh2xyxy(pred_bbox), xywh2xyxy(gt_bbox))
@@ -227,80 +260,109 @@ class NMSLayer(nn.Module):
 
 # NETWORK
 class DarkNet(nn.Module):
-    def __init__(self, cfg, reso=416, thr_obj=0.5, thr_nms=0.5, seq=1):
+    def __init__(self, cfg, reso=416, thr_obj=0.5, thr_nms=0.5, bs=8, seq=1):
         super(DarkNet, self).__init__()
         self.blocks = parse_cfg(cfg)
-        self.reso, self.thr_obj, self.thr_nms, self.seq = reso, thr_obj, thr_nms, seq
+        self.reso, self.thr_obj, self.thr_nms, self.bs, self.seq = reso, thr_obj, thr_nms, bs, seq
         self.net_info, self.module_list = self.create_modules(self.blocks)
         self.nms = NMSLayer(self.thr_obj, self.thr_nms)
 
-    def forward(self, xRaw, yRaw_true=None, CUDA=False):
+    def forward(self, x, y_true=None, CUDA=False):
+        self.bs = x.shape[0]
+        self.seq = x.shape[1]
         modules = self.blocks[1:]
         predictions = torch.Tensor().cuda() if CUDA else torch.Tensor()
         outputs = dict()   #We cache the outputs for the route layer
         # losses = dict()
-
-        for idSeq in range(xRaw.shape[1]):
-            loss = dict()
-            predictions = torch.Tensor().cuda() if CUDA else torch.Tensor()
-            x = xRaw[:, idSeq, ...]
-            if yRaw_true is not None:
-                y_true = yRaw_true[:, idSeq, ...]
-            # print(x.shape)
-            # print(y_true.shape) 
-            for i, module in enumerate(modules):
-                if module["type"] == "convolutional" or module["type"] == "upsample":
-                    x = self.module_list[i](x)
-                    outputs[i] = x
-
-                elif  module["type"] == "shortcut":
-                    from_ = int(module["from"])
-                    x = outputs[i-1] + outputs[i+from_]
-                    outputs[i] = x
-
-                elif module["type"] == "route":
-                    layers = module["layers"]
-                    layers = [int(a) for a in layers]
+        x = x.view(self.bs*self.seq, x.shape[2], x.shape[3], x.shape[4])
         
-                    if (layers[0]) > 0:
-                        layers[0] = layers[0] - i
-        
-                    if len(layers) == 1:
-                        x = outputs[i + (layers[0])]
-        
-                    else:
-                        if (layers[1]) > 0:
-                            layers[1] = layers[1] - i
-        
-                        map1 = outputs[i + layers[0]]
-                        map2 = outputs[i + layers[1]]
-                        x = torch.cat((map1, map2), 1)
-                    outputs[i] = x
-                    
-                elif module["type"] == 'yolo':
-                    if self.training == True:
-                        loss_part = self.module_list[i][0](x, y_true)
-                        loss = dict()
-                        for key, value in loss_part.items():
-                            if key != 'total':
-                                loss[key] = loss[key] + \
-                                    value if key in loss.keys() else value
-                                loss['total'] = loss['total'] + \
-                                    value if 'total' in loss.keys() else value
-                    else:
-                        x = self.module_list[i][0](x)
-                        predictions = x if len(predictions.size()) == 1 else torch.cat(
-                            (predictions, x), 1)
-                            
-                    outputs[i] = outputs[i-1]  # skip
+        for i, module in enumerate(modules):
 
-            if self.training == True:
-                for key, value in loss.items():
-                    loss[key] = value/self.seq
-                # exit()
-                # Print the layer information
+            # # RNN section
+            if self.seq > 1 and (i == 10 or i == 14 or i == 18):
+                if i == 10:
+                    kernel, stride = 8, 8
+                elif i == 14:
+                    kernel, stride = 6, 6                    
+                elif i == 18:
+                    kernel, stride = 4, 4
+                
+                # Max Pool
+                x_, indices = nn.MaxPool2d(kernel, stride, return_indices=True)(x)
+                t_shape = x_.shape
+                x_ = x_.view(self.bs, self.seq, -1)
+
+                # GRU
+                x_, _ = nn.GRU(x_.shape[-1], x_.shape[-1]).cuda()(x_)
+                x_ = x_.view(self.bs*self.seq, t_shape[1], t_shape[2], t_shape[3])
+
+                # Max Unpool
+                x_ = nn.MaxUnpool2d(kernel, stride)(
+                        x_, indices, output_size=x.shape
+                    )
+                x_ = torch.cat((x, x_), dim=1)
+                x_ = x_.view(x_.shape[0], x_.shape[-2], x_.shape[-1], x_.shape[-3])
+
+                # Linear (Combine)
+                x = nn.Linear(x_.shape[-1], x.shape[1]).cuda()(x_)
+                x = x.view(x.shape[0], x.shape[-1], x.shape[-3], x.shape[-2])
+
+                # Batch Normalization
+                x = nn.BatchNorm2d(x.shape[1]).cuda()(x)
+
+            # Rest of the pipeline
+            if module["type"] == "convolutional" or module["type"] == "upsample":
+                x = self.module_list[i](x)
+                outputs[i] = x
+
+            elif  module["type"] == "shortcut":
+                from_ = int(module["from"])
+                x = outputs[i-1] + outputs[i+from_]
+                outputs[i] = x
+
+            elif module["type"] == "route":
+                layers = module["layers"]
+                layers = [int(a) for a in layers]
+    
+                if (layers[0]) > 0:
+                    layers[0] = layers[0] - i
+    
+                if len(layers) == 1:
+                    x = outputs[i + (layers[0])]
+    
+                else:
+                    if (layers[1]) > 0:
+                        layers[1] = layers[1] - i
+    
+                    map1 = outputs[i + layers[0]]
+                    map2 = outputs[i + layers[1]]
+                    x = torch.cat((map1, map2), 1)
+                outputs[i] = x
+                
+            elif module["type"] == 'yolo':
+                x = x.view(self.bs, self.seq, x.shape[-3], x.shape[-2], x.shape[-1])
+                if self.training == True:
+                    loss_part = self.module_list[i][0](x[:,-1,...], y_true[:,-1,...])
+                    loss = dict()
+                    for key, value in loss_part.items():
+                        if key != 'total':
+                            loss[key] = loss[key] + \
+                                value if key in loss.keys() else value
+                            loss['total'] = loss['total'] + \
+                                value if 'total' in loss.keys() else value
+                else:
+                    # Check !!!!
+                    x = self.module_list[i][0](x[:,-1,...])
+                    predictions = x if len(predictions.size()) == 1 else torch.cat(
+                        (predictions, x), 1)
+                        
+                outputs[i] = outputs[i-1]  # skip
             # print(i, module["type"], x.shape)
             # exit()
+                
+        if self.training == True:
+            for key, value in loss.items():
+                loss[key] = value/self.seq
         
         # return prediction result only when evaluated
         if self.training == True:
@@ -309,7 +371,7 @@ class DarkNet(nn.Module):
             predictions = self.nms(predictions)
             return predictions
 
-    def create_modules(self, blocks):
+    def create_modules(self, blocks, seq=1):
         net_info = blocks[0]   #Captures the information about the input and pre-processing  
         module_list = nn.ModuleList()
         in_channels = 3
@@ -370,7 +432,7 @@ class DarkNet(nn.Module):
                     out_channels = out_channels_list[index + start] + out_channels_list[end]        
                 
             # Yolo Layer
-            elif block["type"] == "yolo":
+            elif block["type"] == "yolo":               
                 mask = block["mask"].split(",")
                 mask = [int(x) for x in mask]
         

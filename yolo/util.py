@@ -44,9 +44,17 @@ def IoU(box1, box2):
 
 def xywh2xyxy(bbox, target=False):
     if target:
-        xc, yc = bbox[0], bbox[1]
-        half_w, half_h = bbox[2] / 2, bbox[3] / 2
-        return [xc - half_w, yc - half_h, xc + half_w, yc + half_h]
+        if len(np.array(bbox).shape) == 2:
+            bbox_ = []
+            for b in bbox:
+                xc, yc, half_w, half_h = b[0], b[1], b[2]/2, b[3]/2
+                b[:4] = [xc - half_w, yc - half_h, xc + half_w, yc + half_h]
+                bbox_.append(b)
+            return bbox_
+        else:
+            xc, yc, half_w, half_h = bbox[0], bbox[1], bbox[2]/2, bbox[3]/2
+            bbox[:4] = [xc - half_w, yc - half_h, xc + half_w, yc + half_h]  
+            return bbox
     
     bbox_ = bbox.clone()
     if len(bbox_.size()) == 1:
@@ -62,9 +70,18 @@ def xywh2xyxy(bbox, target=False):
 #Check if it is working!!!
 def xyxy2xywh(bbox, target=False):
     if target:
-        w, h = bbox[2] - bbox[0], bbox[3] - bbox[1]
-        xc, yc = bbox[0] + w/2, bbox[1] + h/2
-        return [xc, yc, w, h]
+        if len(np.array(bbox).shape) == 2:
+            bbox_ = []
+            for b in bbox:
+                w, h = b[2] - b[0], b[3] - b[1]
+                xc, yc = b[0] + w/2, b[1] + h/2
+                b[:4] = [xc, yc, w, h]
+                bbox_.append(b)
+            return bbox_
+        else:
+            w, h, xc, yc = bbox[2] - bbox[0], bbox[3] - bbox[1], bbox[0] + w/2, bbox[1] + h/2
+            bbox[:4] = [xc, yc, w, h]
+            return bbox
     
     bbox_ = bbox.clone()
     if len(bbox_.size()) == 1:
@@ -236,6 +253,7 @@ def draw_prediction(img_path, prediction, target, reso, names, pathout, savename
                       caption, fill='black')
     except Exception:
         print(f'[ERR] TEST | Could not draw target')
+        exit()
 
     # Drawing predictions
     try:

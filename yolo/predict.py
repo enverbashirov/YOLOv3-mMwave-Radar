@@ -69,20 +69,17 @@ def predict():
     darknet = DarkNet(pathcfg, args.reso, args.obj, args.nms)
     pytorch_total_params = sum(p.numel() for p in darknet.parameters() if p.requires_grad)
     print('# of params: ', pytorch_total_params)
-    if args.v > 0:
+    if args.v > 1:
         print(darknet.module_list)
 
     # IMAGE PREPROCESSING!!!
-    transform = transforms.Compose([
-        transforms.Resize(size=(args.reso, args.reso), interpolation=InterpolationMode.BICUBIC),
-        transforms.ToTensor()
-    ])
+    transform = False
     # ====================================================
 
     # Test data allocation
-
-    _, testloader = getDataLoaders(pathin, transform, train_split=args.datasplit, \
-        batch_size=args.bs, sequence=args.seq, num_workers=num_workers, \
+    _, testloader = getDataLoaders(pathin, transform, reso=args.reso, \
+        train_split=args.datasplit, \
+        batch_size=args.bs, seq=args.seq, num_workers=num_workers, \
         collate_fn=collate, random_seed=args.seed)
     # ====================================================
 
@@ -92,7 +89,7 @@ def predict():
     # LOAD A CHECKPOINT!!!
     start_epoch, start_iteration = args.ckpt.split('.')
     start_epoch, start_iteration, state_dict, _, _, _, _ = load_checkpoint(
-        f'save/checkpoints/',
+        f'save/checkpoints_true_cnn_2/',
         int(start_epoch),
         int(start_iteration)
     )
@@ -127,7 +124,6 @@ def predict():
             inputs = inputs.to(device)
             predictions = darknet(inputs)
 
-
             for idx, path in enumerate(paths):
                 print(f'[LOG] PREDICT | Predicting {(bidx*args.bs)+idx+1}/{len(testloader.dataset)}', end='\r')
                 savename = path[-1].split('/')[-1].split('_')[2]
@@ -136,7 +132,8 @@ def predict():
                     prediction = predictions[predictions[:, 0] == idx]
                 except Exception:
                     prediction = torch.Tensor([])
-                    print(f'[ERROR] TEST | No prediction? {prediction}')
+                    if args.v > 0:
+                        print(f'[ERROR] TEST | No prediction? {prediction}')
 
                 predL, outcome = correctness(prediction, targets[idx,-1,...], reso=darknet.reso, iou_thresh=args.iou)
                 predList.extend(predL)
@@ -151,8 +148,8 @@ def predict():
     if args.video:
         animate_predictions(pathout, args.video)
 
-    print(len(predList))
-    print(countLabels)
+    # print(len(predList))
+    # print(countLabels)
     exit()
     predArr = precision_recall(predList, countLabels)
     metrics, interArr = evaluation_metrics(predArr, countLabels, outcomes)

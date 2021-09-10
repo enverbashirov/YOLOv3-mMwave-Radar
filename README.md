@@ -62,13 +62,15 @@ e.g `python . predict --pathin testset3 --pathout test --ckpt 80.0 --nms 0.001 -
 
 #### Changes Required (temporal info)
 
+- [ ] Configure image augmentations
+
 - Data loader (`yolo.dataset`)
-	- Take sequence of images (instead of single image)
+	- [x] Take sequence of images (instead of single image)
 
 - Model (`yolo.darknet`)
 	- Add GRU layer
 	- Combine GRU output with current timestep features
-	- Add the new loss parameter
+	- [x] Add the new loss parameter
 
 - Network (`cfg\yolov3micro.cfg`)
     - Add/modify GRU layer
@@ -78,10 +80,16 @@ e.g `python . predict --pathin testset3 --pathout test --ckpt 80.0 --nms 0.001 -
 
 ## ChangeLog
 
+31.08.2021 - EB - Version 1.3.4
+- Implemented RNN (GRU) logic
+    - [x] Add GRU state layer to use temporal information
+- Implemented image augmentation
+
 04.08.2021 - EB - Version 1.3.3
 - Working on RNN implementation
 - Working on image augmentations
 - Implemented sequence training
+- Added `scripts/recalculatebbox.py` which recalculates the label bounding boxes in a better way.
 
 23.06.2021 - EB - Version 1.3.2
 - Implemented `plot_precision_recall()`

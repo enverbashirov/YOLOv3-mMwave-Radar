@@ -57,10 +57,10 @@ def train():
     args = parse_arg()
     pathcfg = f"cfg/{args.cfg}.cfg"
     pathin = f"dataset/{args.pathin}/final"
-    num_workers = 2
+    num_workers = 4
 
     # NETWORK
-    darknet = DarkNet(pathcfg, args.reso, seq=args.seq)
+    darknet = DarkNet(pathcfg, args.reso, bs=args.bs, seq=args.seq)
     pytorch_total_params = sum(p.numel() for p in darknet.parameters() if p.requires_grad)
     print('# of params: ', pytorch_total_params)
     if args.v > 0:
@@ -90,29 +90,12 @@ def train():
         scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=10, gamma=0.1)
 
     # IMAGE PREPROCESSING!!!
-    # transform = transforms.Compose([
-    #     # transforms.RandomResizedCrop(size=args.reso, interpolation=3),
-    #     transforms.Resize(size=(args.reso, args.reso), interpolation=3),
-    #     transforms.ColorJitter(brightness=1.5, saturation=1.5, hue=0.2),
-    #     transforms.RandomVerticalFlip(),
-    #     transforms.ToTensor()
-    # ])
-    transform = transforms.Compose([
-        # transforms.Resize(size=(args.reso, args.reso), interpolation=InterpolationMode.BICUBIC),
-        transforms.ToTensor(),
-    ])
-    # transform = [      
-    #     [('TranslateX_BBox', 0.6, 4), ('Equalize', 0.8, 10)],        
-    #     [('TranslateY_Only_BBoxes', 0.2, 2), ('Cutout', 0.8, 8)],     
-    #     [('Sharpness', 0.0, 8), ('ShearX_BBox', 0.4, 0)],      
-    #     [('ShearY_BBox', 1.0, 2), ('TranslateY_Only_BBoxes', 0.6, 6)], 
-    #     [('Rotate_BBox', 0.6, 10), ('Color', 1.0, 6)],
-    # ]
+    transform = True
     # ====================================================
 
     # Train and Validation data allocation
-    trainloader, validloader = getDataLoaders(pathin, transform, \
-        train_split=args.datasplit, batch_size=args.bs, sequence=args.seq, \
+    trainloader, validloader = getDataLoaders(pathin, transform, reso=args.reso, \
+        train_split=args.datasplit, batch_size=args.bs, seq=args.seq, \
         num_workers=num_workers, collate_fn=collate, random_seed=args.seed)
     # ====================================================
 
@@ -140,12 +123,6 @@ def train():
 
         for batch_idx, (_, inputs, targets) in enumerate(trainloader):
             optimizer.zero_grad()   # clear the grads from prev passes
-
-            print(transforms.ToPILImage(inputs[0,0,...]))
-            # plt.imshow(np.reshape(np.array(inputs[0,0,...]),(416,416,3)))
-            plt.imshow(transforms.ToPILImage(inputs[0,0,...]))
-            plt.show()
-            exit()
 
             inputs, targets = inputs.to(device), targets.to(device) # Images, Labels
 
@@ -195,8 +172,9 @@ def train():
         # ====================================================
         # metric, _= evaluation_metrics(predList, countLabels, outcomes)
 
-        if (epoch % 10) == 9:
-            save_checkpoint(f'save/checkpoints/', epoch+1, 0, {
+        # if (epoch % 10) == 9:
+        if True:
+            save_checkpoint(f'save/checkpoints_test/', epoch+1, 0, {
                 'epoch': epoch+1,
                 'iteration': 0,
                 'state_dict': darknet.state_dict(),
@@ -206,17 +184,16 @@ def train():
                 'optimizer': optimizer,
                 'scheduler': scheduler
             })
-            plot_losses(tlosses, vlosses, f'save/losses')
+            plot_losses(tlosses, vlosses, f'save/losses_test')
 
-    save_checkpoint(f'save/checkpoints/', epoch+1, 0, {
-        'epoch': epoch+1,
-        'iteration': 0,
-        'state_dict': darknet.state_dict(),
-        'tlosses': tlosses,
-        'vlosses': vlosses,
-        'optimizer': optimizer,
-        'scheduler': scheduler
-    })
-    plot_losses(tlosses, vlosses, f'save/losses')
+    # save_checkpoint(f'save/checkpoints/', epoch+1, 0, {
+    #     'epoch': epoch+1,
+    #     'iteration': 0,
+    #     'state_dict': darknet.state_dict(),
+    #     'tlosses': tlosses,
+    #     'vlosses': vlosses,
+    #     'optimizer': optimizer,
+    #     'scheduler': scheduler
+    # })
+    # plot_losses(tlosses, vlosses, f'save/losses')
     # plot_accuracies(metrics, f'save/performance')
-
