@@ -62,25 +62,20 @@ e.g `python . predict --pathin testset3 --pathout test --ckpt 80.0 --nms 0.001 -
 
 #### Changes Required (temporal info)
 
-- [ ] Configure image augmentations
+- Total number of parameters doesn't include GRU section
 
-- Data loader (`yolo.dataset`)
-	- [x] Take sequence of images (instead of single image)
-
-- Model (`yolo.darknet`)
-	- Add GRU layer
-	- Combine GRU output with current timestep features
-	- [x] Add the new loss parameter
-
-- Network (`cfg\yolov3micro.cfg`)
-    - Add/modify GRU layer
-    - Add/modify feedforward layer
-    - Combine layer (GRU output with current timestep features)
+- mAP calculation only takes IoU into account
+    - [ ] Implement objectiveness score precision/recall calculation
 	
 
 ## ChangeLog
 
-31.08.2021 - EB - Version 1.3.4
+12.08.2021 - EB - Version 1.3.5
+- Optimizations for GRU network
+    - Autoencoder/decoder logic for dimensionality reduction
+    - Merging some layers after GRU with previous
+
+10.08.2021 - EB - Version 1.3.4
 - Implemented RNN (GRU) logic
     - [x] Add GRU state layer to use temporal information
 - Implemented image augmentation

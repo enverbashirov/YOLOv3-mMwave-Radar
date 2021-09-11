@@ -6,57 +6,60 @@ import numpy as np
 from .util import *
 
 # =================================================================
-# MAXPOOL (NOT USED)
-class MaxPool1s(nn.Module):
-
-    def __init__(self, kernel_size):
-        super(MaxPool1s, self).__init__()
-        self.kernel_size = kernel_size
-        self.pad = kernel_size - 1
-
-    def forward(self, x):
-        padded_x = F.pad(x, (0, self.pad, 0, self.pad), mode="replicate")
-        pooled_x = nn.MaxPool2d(self.kernel_size, self.pad)(padded_x)
-        return pooled_x
-
 # EMPTY LAYER
 class EmptyLayer(nn.Module):
     def __init__(self):
         super(EmptyLayer, self).__init__()
 
-# HIDDEN LAYER (FOR RNN)
-class HiddenLayer(nn.Module):
-    def __init__(self, hidden_size):
-        super(HiddenLayer, self).__init__()
-        self.hidden_size = hidden_size
-        self.x = torch.zeros(self.hidden_size).cuda()
+# LINEAR 1D DECODER
+class Decoder1D(nn.Module):
+    def __init__(self, in_features, out_features):
+        super(Decoder1D, self).__init__()
+        self.in_features = in_features
+        self.out_features = out_features
+        self.decoder = self.initDecoder()
+
+    def initDecoder(self):
+        module_list = []
+        inp = int(self.in_features)
+        out = int(inp * 2)
+        while True:
+            if inp >= self.out_features: break
+            if out > self.out_features: out = self.out_features
+            module_list.append(nn.Linear(inp, out))
+            module_list.append(nn.ReLU())
+            inp = out
+            out = int(out * 2)
+
+        return nn.Sequential(*module_list).cuda()
         
-    def forward(self, x=None):
-        if x != None:
-            self.x = x.cuda()
-        return self.x
-
-# COMBINE LAYER (FOR RNN)
-class CombineLayer(nn.Module):
-    def __init__(self):
-        super(CombineLayer, self).__init__()
-
-    def forward(self, x, x_):
-        return torch.cat((x, x_), 1)
-
-class GRULayer(nn.Module):
-    def __init__(self, input_size, hidden_size, bias=True):
-        super(GRULayer, self).__init__()
-        self.hidden_size = hidden_size
-        self.hidden_state = None
-        self.gru = nn.GRU(input_size, hidden_size, bias).cuda()
-
     def forward(self, x):
-        if self.hidden_state == None:
-            self.hidden_state = self.gru(x)
-        else:
-            self.hidden_state = self.gru(x, self.h)
-        return self.hidden_state
+        return self.decoder(x)
+
+# ENCODER
+class Encoder1D(nn.Module):
+    def __init__(self, in_features, out_features):
+        super(Encoder1D, self).__init__()
+        self.in_features = in_features
+        self.out_features = out_features
+        self.encoder = self.initEncoder()
+
+    def initEncoder(self):
+        module_list = []
+        inp = int(self.in_features)
+        out = int(inp / 2)
+        while True:
+            if inp <= self.out_features: break
+            if out < self.out_features: out = self.out_features
+            module_list.append(nn.Linear(inp, out))
+            module_list.append(nn.ReLU())
+            inp = out
+            out = int(out / 2)
+
+        return nn.Sequential(*module_list).cuda()
+        
+    def forward(self, x):
+        return self.encoder(x)
 
 # YOLO / PREDICTION LAYER
 class YOLOLayer(nn.Module):
@@ -273,43 +276,83 @@ class DarkNet(nn.Module):
         modules = self.blocks[1:]
         predictions = torch.Tensor().cuda() if CUDA else torch.Tensor()
         outputs = dict()   #We cache the outputs for the route layer
-        # losses = dict()
+        loss = dict()
         x = x.view(self.bs*self.seq, x.shape[2], x.shape[3], x.shape[4])
         
         for i, module in enumerate(modules):
 
             # # RNN section
             if self.seq > 1 and (i == 10 or i == 14 or i == 18):
-                if i == 10:
-                    kernel, stride = 8, 8
-                elif i == 14:
-                    kernel, stride = 6, 6                    
-                elif i == 18:
-                    kernel, stride = 4, 4
+
+                # 2D Conv Encoder
+                # print('2D Conv Encoder')
+                o_shape = x.shape
+                # print(o_shape)
+                x_ = x
+                while x_.shape[-1] > 13:
+                    x_ = nn.Conv2d(x_.shape[-3], x_.shape[-3]*2, kernel_size=2, stride=2).cuda()(x_)
+                    # print(x_.shape)
+                # x1 = x_.clone().cuda()
                 
-                # Max Pool
-                x_, indices = nn.MaxPool2d(kernel, stride, return_indices=True)(x)
+                # Encoder
+                # print('Encode')
                 t_shape = x_.shape
-                x_ = x_.view(self.bs, self.seq, -1)
+                # print(t_shape)
+                x_ = x_.view(x.shape[0], x_.shape[-2], x_.shape[-1], x_.shape[-3])
+                # print(x_.shape)
+                x_ = Encoder1D(x_.shape[-1], 2)(x_)
+                # print(x_.shape)
+                en_shape = x_.shape
+                x2 = x_.clone()
+
+                # Max Pool
+                # print('1 x', x.shape)
+                # x_, indices = nn.MaxPool2d(kernel, stride, return_indices=True)(x)
+                # t_shape = x_.shape
+                # print('2 x_', x_.shape)
 
                 # GRU
+                # print('GRU')
+                x_ = x_.view(self.bs, self.seq, -1)
+                # print(x_.shape)
                 x_, _ = nn.GRU(x_.shape[-1], x_.shape[-1]).cuda()(x_)
-                x_ = x_.view(self.bs*self.seq, t_shape[1], t_shape[2], t_shape[3])
+                # print(x_.shape)
+                
+                # print('Combine with previous')
+                x_ = x_.view(self.bs*self.seq, en_shape[-3], en_shape[-2], en_shape[-1])
+                # print(x_.shape)
+                x_ = torch.cat((x2, x_), dim=-1)
+                # print(x_.shape)
+                x_ = nn.Linear(x_.shape[-1], en_shape[-1]).cuda()(x_)
+                x_ = nn.ReLU()(x_)
+                # print(x_.shape)
 
-                # Max Unpool
-                x_ = nn.MaxUnpool2d(kernel, stride)(
-                        x_, indices, output_size=x.shape
-                    )
+                # Decoder
+                # print('Decode')
+                # print(x_.shape)
+                x_ = Decoder1D(x_.shape[-1], t_shape[-3])(x_)
+                # print(x_.shape)
+
+                # 2D Conv Decoder
+                # print('2D Conv Decoder')
+                x_ = x_.view(self.bs*self.seq, x_.shape[-1], x_.shape[-3], x_.shape[-2])
+                while x_.shape[-2] < o_shape[-2]:
+                    x_ = nn.ConvTranspose2d(x_.shape[-3], int(x_.shape[-3]/2), kernel_size=2, stride=2).cuda()(x_)
+                    # print(x_.shape)
+
+                # print('Combine with previous')
+                # print(x_.shape)
                 x_ = torch.cat((x, x_), dim=1)
-                x_ = x_.view(x_.shape[0], x_.shape[-2], x_.shape[-1], x_.shape[-3])
+                # print(x_.shape)
+                x_ = x_.view(self.bs*self.seq, x_.shape[-2], x_.shape[-1], x_.shape[-3])
+                # print(x_.shape)
+                x_ = nn.Linear(x_.shape[-1], o_shape[-3]).cuda()(x_)
+                x_ = nn.ReLU()(x_)
+                # print(x_.shape)
+                x = x_.view(self.bs*self.seq, x_.shape[-1], x_.shape[-3], x_.shape[-2])
+                # print(x_.shape)
 
-                # Linear (Combine)
-                x = nn.Linear(x_.shape[-1], x.shape[1]).cuda()(x_)
-                x = x.view(x.shape[0], x.shape[-1], x.shape[-3], x.shape[-2])
-
-                # Batch Normalization
-                x = nn.BatchNorm2d(x.shape[1]).cuda()(x)
-
+                # exit()
             # Rest of the pipeline
             if module["type"] == "convolutional" or module["type"] == "upsample":
                 x = self.module_list[i](x)
@@ -343,7 +386,6 @@ class DarkNet(nn.Module):
                 x = x.view(self.bs, self.seq, x.shape[-3], x.shape[-2], x.shape[-1])
                 if self.training == True:
                     loss_part = self.module_list[i][0](x[:,-1,...], y_true[:,-1,...])
-                    loss = dict()
                     for key, value in loss_part.items():
                         if key != 'total':
                             loss[key] = loss[key] + \
@@ -351,19 +393,18 @@ class DarkNet(nn.Module):
                             loss['total'] = loss['total'] + \
                                 value if 'total' in loss.keys() else value
                 else:
-                    # Check !!!!
                     x = self.module_list[i][0](x[:,-1,...])
                     predictions = x if len(predictions.size()) == 1 else torch.cat(
                         (predictions, x), 1)
                         
                 outputs[i] = outputs[i-1]  # skip
             # print(i, module["type"], x.shape)
-            # exit()
+            exit()
                 
         if self.training == True:
             for key, value in loss.items():
                 loss[key] = value/self.seq
-        
+        # exit()
         # return prediction result only when evaluated
         if self.training == True:
             return loss

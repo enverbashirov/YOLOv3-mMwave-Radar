@@ -13,21 +13,23 @@ import matplotlib.pyplot as plt
 import time
 from .util import *
 
-# anchors_wh = np.array([[10, 13], [16, 30], [33, 23], [30, 61], [62, 45],
-#                        [59, 119], [116, 90], [156, 198], [373, 326]],
-#                       np.float32) / 416
-
 class MmwaveDataset(torch.utils.data.Dataset):
     def __init__(self, data_dir, data_size = 0, reso=416, transforms = None, seq = 1):
         files = sorted(os.listdir(data_dir))
-        self.files = [f"{data_dir}/{x}" for x in files]
-        # self.files = self.files[:int(len(self.files)/100)]
+        files = [f"{data_dir}/{x}" for x in files]
+        self.files = []
+        if seq > 1:
+            for i in range(0, len(files)-seq):
+                if int(files[i].split('_')[2])+seq == int(files[i+seq].split('_')[2]):
+                    self.files.append(files[i:i+seq])
+        else:
+            self.files = files
 
         if data_size < 0 or data_size > len(self.files):
             assert("Data size should be between 0 to number of files in the dataset")
         
         if data_size == 0:
-            data_size = len(self.files)-seq
+            data_size = len(self.files)
         
         self.data_size = data_size
         self.reso = reso
@@ -39,8 +41,7 @@ class MmwaveDataset(torch.utils.data.Dataset):
 
     def __getitem__(self, idx):
         image_paths, images, images_, labels, labels_, bbs = [], [], [], [], [], []
-        for s in range(0, self.seq):
-            image_path = self.files[idx+s]
+        for image_path in self.files[idx]:
             image = Image.open(image_path)
             img_w, img_h = image.size
             labels_str = image_path.split("_")[-1]
@@ -120,18 +121,18 @@ class MmwaveDataset(torch.utils.data.Dataset):
                 iaa.Sometimes(0.05, iaa.SaltAndPepper(0.05)),
                 iaa.Dropout(p=(0, 0.05)), # dropout some pixels
 
-                iaa.Sometimes(0.01, iaa.GaussianBlur(sigma=(0, 0.5))),
+                # iaa.Sometimes(0.01, iaa.GaussianBlur(sigma=(0, 0.5))),
 
                 # Strengthen or weaken the contrast in each image.
                 # iaa.Sometimes(0.2, iaa.LinearContrast((0.9, 1.01))),
 
                 # Add gaussian noise.
-                iaa.Sometimes(0.02,
-                    iaa.AdditiveGaussianNoise(loc=0, scale=(0.0, 0.05*255), per_channel=0.2),
-                ),
+                # iaa.Sometimes(0.02,
+                #     iaa.AdditiveGaussianNoise(loc=0, scale=(0.0, 0.05*255), per_channel=0.2),
+                # ),
 
                 # Make some images brighter and some darker.
-                iaa.Sometimes(0.1, iaa.Multiply((0.9, 1.1), per_channel=0.1)),
+                iaa.Sometimes(0.01, iaa.Multiply((0.9, 1.1), per_channel=1)),
 
                 # Scale/zoom
                 iaa.Sometimes(0.1, iaa.Affine(scale={"x": (0.9, 1.0), "y": (0.9, 1)})),

@@ -89,7 +89,7 @@ def predict():
     # LOAD A CHECKPOINT!!!
     start_epoch, start_iteration = args.ckpt.split('.')
     start_epoch, start_iteration, state_dict, _, _, _, _ = load_checkpoint(
-        f'save/checkpoints_true_cnn_2/',
+        f'save/checkpoints_test/',
         int(start_epoch),
         int(start_iteration)
     )
